@@ -1,0 +1,38 @@
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Modelos y datos (se publican en un GitHub Release)
+models/*
+!models/README.md
+data/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Salidas locales
+results/
+samples_output/
+.screenshots/
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+.vscode/
