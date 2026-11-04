@@ -12,7 +12,7 @@ Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una t
 | T1 | Dataset, remapeo, partición, búsqueda de fuego | ML | en curso | 2026-11-02 | 0 | |
 | T2 | Notebook, evaluación, exportación; entrenamiento lo ejecuta Erika Bonilla en Colab | ML + Erika | en curso | 2026-11-02 | 0 | |
 | T3 | API, validaciones, inferencia, jobs, modelo dummy | Backend | aprobada (Fase 1; se repite con el modelo real en la Fase 2) | 2026-11-03 | 1 | Orquestador: pytest 220 pasadas, 0 omitidas, con FFmpeg real; flujo real con uvicorn hasta MP4/GIF válidos; `/analyze` 1080p 999 ms **con modelo dummy** |
-| T4 | Efectos, parallax, partículas, moods, video | Motor | en curso | 2026-11-02 | 0 | |
+| T4 | Efectos, parallax, partículas, moods, video | Motor | aprobada (Fase 1; falta revisión humana de los MP4 en movimiento) | 2026-11-03 | 1 | Orquestador: motor 108 pruebas y backend 220 pasadas; por API real con CPU al 74 % y modelo dummy, 48 frames en 13,1 s de render (antes 29,5 s), es decir, unos 26 s por 96 frames, cifra extrapolada; revisión de hojas de contacto. Máscaras de prueba, no del modelo real |
 | T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | en curso | 2026-11-02 | 0 | |
 | T6 | Pruebas de API, modelo, rendimiento y frontend | QA | pendiente | | 0 | |
 | T7 | Docker, Kubernetes, CI/CD, monitoreo, `make demo` | DevOps | pendiente | | 0 | |
@@ -47,6 +47,9 @@ La tabla completa, con su mitigación, está en [PLAN.md](PLAN.md#6-riesgos).
 | Cortes o cuota de Colab | Abierto | 6 nov |
 | El wifi de la Expo bloquea el QR | Abierto; requiere router propio | 18 nov |
 | RAM justa en el portátil | Abierto | Fase 2 |
+| Límite de uso de la cuenta: cuatro agentes en paralelo lo agotaron en menos de una hora y se perdió cerca de un día | Abierto; se trabaja por tandas | Cada fase |
+| Bordes imprecisos del modelo real: lo mal clasificado como cielo se mueve con las nubes | Abierto; se evalúa con el modelo entrenado | Fase 2 |
+| Render cercano al objetivo de 30 s cuando la máquina está cargada | Abierto; medir con el modelo real y en el pod | Fase 2 |
 
 ## Resúmenes de fase
 

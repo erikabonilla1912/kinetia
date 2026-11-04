@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.2.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.3.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -424,10 +424,19 @@ Son valores de partida, ajustables por el Agente Motor tras verlos en pantalla. 
 
 | Mood | speed | saturation | warmth | contrast | particle_kind | particle_density | parallax_amplitude | vignette |
 |---|---|---|---|---|---|---|---|---|
-| `calma` | 0.6 | 0.95 | 0.05 | 1.00 | `polen` | 15 | 0.010 | 0.10 |
-| `epico` | 1.4 | 1.15 | -0.10 | 1.20 | `brasas` | 40 | 0.022 | 0.35 |
-| `magico` | 1.0 | 1.25 | -0.05 | 1.05 | `chispas` | 60 | 0.015 | 0.20 |
-| `nostalgico` | 0.8 | 0.70 | 0.35 | 0.95 | `polvo` | 25 | 0.012 | 0.40 |
+| `calma` | 0.6 | 0.95 | 0.05 | 1.00 | `polen` | 30 | 0.010 | 0.10 |
+| `epico` | 1.4 | 1.15 | -0.10 | 1.20 | `brasas` | 75 | 0.022 | 0.35 |
+| `magico` | 1.0 | 1.25 | -0.05 | 1.05 | `chispas` | 110 | 0.015 | 0.20 |
+| `nostalgico` | 0.8 | 0.70 | 0.35 | 0.95 | `polvo` | 50 | 0.012 | 0.40 |
+
+**Comportamientos precisados:**
+
+- **`fuego_luz`:** el brillo sale de la región, hasta unos 280 px con un lado mayor de 1280 (`glow_reach_px`). Es la única excepción a "los efectos no tocan otras clases".
+- **Modo `only`:** sin parallax ni efectos de clase. Lo pintado se mueve según el pincel; el resto lleva el color del mood, pero no cambia en el tiempo.
+- **`particle_kind="none"`:** apaga también las hojas de la regla de bosque.
+- **Video:** noche, bosque, partículas y encuadre se fijan con el primer frame (en noche, el primero que tenga cielo), para evitar parpadeos. `duration_s` es el ciclo de los efectos. Un video de entrada no cierra en loop.
+- **Validación:** `animate_image` lanza `ValueError` al llamarla, no en el primer `next`, y rechaza máscaras que no sean `uint8` o con valores mayores que 6.
+- **Hilos:** el motor limita OpenCV a 4 hilos durante el render. `cv2.setNumThreads` es global, y se acepta que afecte a otro código de OpenCV durante ese tiempo: cambia su duración, no su resultado.
 
 ---
 
@@ -578,5 +587,6 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.3.0 | 2026-11-03 | Densidades finales de partículas y comportamientos precisados del motor | Propuestas del Agente Motor, aceptadas |
 | 1.2.0 | 2026-11-02 | `label` en `/config`; `seed` en jobs; códigos de error añadidos; `stage: done`; `null` en tiempos sin medir; fechas con milisegundos; marca del `metrics.json` dummy | Propuestas del Agente Backend, aceptadas |
 | 1.1.0 | 2026-11-02 | `metrics_test.json` pasa a `metrics.json`; se añaden `hashes.sha256`, modelos dummy en `models/dev/`, evaluación sobre el ONNX y versión fija de OpenCV; se quita `sha256_image` del manifiesto | Aprobación del equipo y flujo de entrenamiento en Colab |
