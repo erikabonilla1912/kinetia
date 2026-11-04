@@ -1,0 +1,238 @@
+{
+  "generated_by": "ml/count_pixels.py",
+  "resolution": "nativa de cada mascara",
+  "dataset_manifest_sha256": "fb8a7cc42dac1b726111abffe315e974014eb3880f160d9b0ef3095d3ba47b9d",
+  "fire_category_check": {
+    "categories_total": 172,
+    "pattern_searched": "fire|flame|burn|blaze|ember|smoke|candle|torch",
+    "categories_matching_with_pixels": {
+      "fire hydrant": 36813121
+    },
+    "has_fire_category": false,
+    "note": "`fire hydrant` es un hidrante. COCO-Stuff no tiene categoria de fuego.",
+    "light_category_id": 130,
+    "light_pixels": 44865026,
+    "images_with_light": 12220
+  },
+  "all_coco_stuff_trainval": {
+    "num_images": 123287,
+    "per_class": {
+      "fondo": {
+        "pixels": 20322223043,
+        "pct_of_labeled": 63.6263
+      },
+      "cielo": {
+        "pixels": 2750941100,
+        "pct_of_labeled": 8.6128
+      },
+      "agua": {
+        "pixels": 1066686810,
+        "pct_of_labeled": 3.3397
+      },
+      "vegetacion": {
+        "pixels": 3797460474,
+        "pct_of_labeled": 11.8894
+      },
+      "fuego_luz": {
+        "pixels": 44865026,
+        "pct_of_labeled": 0.1405
+      },
+      "persona": {
+        "pixels": 2875974441,
+        "pct_of_labeled": 9.0043
+      },
+      "animal": {
+        "pixels": 1081832816,
+        "pct_of_labeled": 3.3871
+      }
+    },
+    "ignore_255_pixels": 2067485920,
+    "ignore_pct_of_total": 6.0795
+  },
+  "selected_all": {
+    "num_images": {
+      "coco_stuff": 15000,
+      "bowfire": 119
+    },
+    "fuego_luz_from_coco_light": 16551675,
+    "fuego_luz_from_bowfire_fire": 9104531,
+    "per_class": {
+      "fondo": {
+        "pixels": 2232139431,
+        "pct_of_labeled": 56.7811
+      },
+      "cielo": {
+        "pixels": 358430715,
+        "pct_of_labeled": 9.1178
+      },
+      "agua": {
+        "pixels": 363565237,
+        "pct_of_labeled": 9.2484
+      },
+      "vegetacion": {
+        "pixels": 461641809,
+        "pct_of_labeled": 11.7432
+      },
+      "fuego_luz": {
+        "pixels": 25656206,
+        "pct_of_labeled": 0.6526
+      },
+      "persona": {
+        "pixels": 287693554,
+        "pct_of_labeled": 7.3183
+      },
+      "animal": {
+        "pixels": 202000793,
+        "pct_of_labeled": 5.1385
+      }
+    },
+    "ignore_255_pixels": 300797384,
+    "ignore_pct_of_total": 7.1078
+  },
+  "selected_train": {
+    "num_images": {
+      "coco_stuff": 10500,
+      "bowfire": 83
+    },
+    "fuego_luz_from_coco_light": 11484733,
+    "fuego_luz_from_bowfire_fire": 6184053,
+    "per_class": {
+      "fondo": {
+        "pixels": 1560250162,
+        "pct_of_labeled": 56.8102
+      },
+      "cielo": {
+        "pixels": 252295972,
+        "pct_of_labeled": 9.1863
+      },
+      "agua": {
+        "pixels": 253296550,
+        "pct_of_labeled": 9.2228
+      },
+      "vegetacion": {
+        "pixels": 324334056,
+        "pct_of_labeled": 11.8093
+      },
+      "fuego_luz": {
+        "pixels": 17668786,
+        "pct_of_labeled": 0.6433
+      },
+      "persona": {
+        "pixels": 197467323,
+        "pct_of_labeled": 7.19
+      },
+      "animal": {
+        "pixels": 141111401,
+        "pct_of_labeled": 5.138
+      }
+    },
+    "ignore_255_pixels": 215530157,
+    "ignore_pct_of_total": 7.2766
+  },
+  "selected_val": {
+    "num_images": {
+      "coco_stuff": 2250,
+      "bowfire": 18
+    },
+    "fuego_luz_from_coco_light": 2604789,
+    "fuego_luz_from_bowfire_fire": 1361409,
+    "per_class": {
+      "fondo": {
+        "pixels": 332989502,
+        "pct_of_labeled": 56.1496
+      },
+      "cielo": {
+        "pixels": 54763565,
+        "pct_of_labeled": 9.2344
+      },
+      "agua": {
+        "pixels": 56655765,
+        "pct_of_labeled": 9.5535
+      },
+      "vegetacion": {
+        "pixels": 68012652,
+        "pct_of_labeled": 11.4685
+      },
+      "fuego_luz": {
+        "pixels": 3966198,
+        "pct_of_labeled": 0.6688
+      },
+      "persona": {
+        "pixels": 44929374,
+        "pct_of_labeled": 7.5761
+      },
+      "animal": {
+        "pixels": 31722447,
+        "pct_of_labeled": 5.3491
+      }
+    },
+    "ignore_255_pixels": 41409284,
+    "ignore_pct_of_total": 6.5268
+  },
+  "selected_test": {
+    "num_images": {
+      "coco_stuff": 2250,
+      "bowfire": 18
+    },
+    "fuego_luz_from_coco_light": 2462153,
+    "fuego_luz_from_bowfire_fire": 1559069,
+    "per_class": {
+      "fondo": {
+        "pixels": 338899767,
+        "pct_of_labeled": 57.2791
+      },
+      "cielo": {
+        "pixels": 51371178,
+        "pct_of_labeled": 8.6825
+      },
+      "agua": {
+        "pixels": 53612922,
+        "pct_of_labeled": 9.0614
+      },
+      "vegetacion": {
+        "pixels": 69295101,
+        "pct_of_labeled": 11.7119
+      },
+      "fuego_luz": {
+        "pixels": 4021222,
+        "pct_of_labeled": 0.6796
+      },
+      "persona": {
+        "pixels": 45296857,
+        "pct_of_labeled": 7.6558
+      },
+      "animal": {
+        "pixels": 29166945,
+        "pct_of_labeled": 4.9296
+      }
+    },
+    "ignore_255_pixels": 43857943,
+    "ignore_pct_of_total": 6.9011
+  },
+  "png_value_equals_category_id_minus_1_check": {
+    "person": {
+      "category_id": 1,
+      "images": 2693,
+      "correlation_png_value_id_minus_1": 0.9977335987869007,
+      "total_area_ratio_png_over_annotations": 0.9792406289849908
+    },
+    "dog": {
+      "category_id": 18,
+      "images": 177,
+      "correlation_png_value_id_minus_1": 0.9431026515875761,
+      "total_area_ratio_png_over_annotations": 0.8961212343709639
+    },
+    "airplane": {
+      "category_id": 5,
+      "images": 97,
+      "correlation_png_value_id_minus_1": 0.9999714024840511,
+      "total_area_ratio_png_over_annotations": 0.9967729960713814
+    },
+    "toilet": {
+      "category_id": 70,
+      "images": 149,
+      "correlation_png_value_id_minus_1": 0.9996949427604265,
+      "total_area_ratio_png_over_annotations": 0.9956123529145009
+    }
+  }
+}

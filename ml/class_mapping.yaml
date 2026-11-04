@@ -1,0 +1,28 @@
+# Remapeo de COCO-Stuff 164k a las 7 clases de KINETIA (docs/CONTRATOS.md, seccion 1).
+# Se define por NOMBRE de categoria, nunca por id numerico. Los ids solo aparecen en
+# ml/coco_categories.json, que se extrajo de los JSON oficiales de COCO.
+classes: [fondo, cielo, agua, vegetacion, fuego_luz, persona, animal]
+ignore_index: 255
+
+coco_stuff:
+  # En stuffthingmaps_trainval2017.zip, valor del PNG = category_id - 1; 255 = unlabeled.
+  # ml/count_pixels.py lo comprueba contra las anotaciones de instancias reales.
+  png_value_offset: -1
+  unlabeled_png_value: 255
+  mapping:
+    cielo: [sky-other, clouds]
+    agua: [sea, river, water-other]
+    vegetacion: [tree, grass, bush, plant-other, flower, leaves, moss]
+    fuego_luz: [light]
+    persona: [person]
+    animal: [bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe]
+  # Cualquier otra categoria etiquetada.
+  default_class: fondo
+
+# Fuente externa de fuego. Solo cuenta el fuego; todo lo demas queda en ignore_index.
+# La mascara BoWFire marca el fuego en blanco y el resto en negro.
+external_sources:
+  bowfire:
+    foreground_class: fuego_luz
+    background: ignore
+    foreground_threshold: 127

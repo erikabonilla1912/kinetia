@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.3.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.4.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -36,11 +36,13 @@ Se implementa en `ml/class_mapping.yaml`, por **nombre** de categoría y nunca p
 | `cielo` | `sky-other`, `clouds` |
 | `agua` | `sea`, `river`, `water-other` |
 | `vegetacion` | `tree`, `grass`, `bush`, `plant-other`, `flower`, `leaves`, `moss` |
-| `fuego_luz` | `light` + fuente externa de fuego (ver Decisión D2 en `PLAN.md`) |
+| `fuego_luz` | `light` + máscaras de fuego de BoWFire (Chino et al., SIBGRAPI 2015; hay que citarlo) |
 | `persona` | `person` |
 | `animal` | `bird`, `cat`, `dog`, `horse`, `sheep`, `cow`, `elephant`, `bear`, `zebra`, `giraffe` |
 | `fondo` | Cualquier otra categoría etiquetada |
-| `255` | `unlabeled` de COCO-Stuff. En imágenes de una fuente externa de fuego: todo píxel que no sea fuego |
+| `255` | `unlabeled` de COCO-Stuff. En imágenes de BoWFire: todo píxel que no sea fuego |
+
+**Limitación de `fuego_luz` que se declara en la demo y en el documento:** BoWFire tiene 119 imágenes de incendios a nivel de suelo, casi sin fogatas y sin velas ni chimeneas vistas en la revisión. Una vela o una chimenea pueden no detectarse. Y como en esas imágenes el resto queda en 255, allí no se miden falsos positivos de fuego: el modelo podría confundir objetos naranjas con fuego.
 
 ---
 
@@ -151,7 +153,11 @@ Los binarios no se versionan en git. Se publican como asset de un GitHub Release
 
 ### Partición de datos
 
-- `ml/splits/manifest.csv`, con columnas `image_id, source, split`. Partición 70/15/15 con `seed=42`, generada una sola vez y versionada en git. Se puede generar solo con las anotaciones, sin descargar las imágenes.
+- `ml/splits/manifest.csv`, con columnas `image_id, source, split`. Partición 70/15/15 con `seed=42`, generada una sola vez y versionada en git. Se puede generar solo con las anotaciones, sin descargar las imágenes. Valores de `source`: `coco_stuff` y `bowfire`.
+- `dataset_manifest_sha256` es el SHA-256 del archivo con los finales de línea normalizados a LF, para que Windows y Colab den el mismo hash.
+- Las métricas se calculan a 320×320, sin los píxeles 255. mIoU y Dice promedian solo las clases con datos.
+- `evaluated_at` y `created_at` de los archivos de modelo van sin milisegundos: la regla de milisegundos es de las fechas que genera la API. `/model/metrics` devuelve el archivo sin cambios.
+- `train.py` escribe el `.pt`, y `export.py` lo copia a la carpeta de artefactos.
 - `evaluate.py` termina con error si el hash del manifiesto no coincide con el de `manifest.json`.
 - `train.py` no puede abrir imágenes de `split=test`. La prueba es un test automatizado.
 
@@ -587,6 +593,7 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.4.0 | 2026-11-03 | BoWFire como fuente de fuego, con su limitación; valores de `source`; definición del hash del manifiesto y de las métricas | Decisión D2 y propuestas del Agente ML |
 | 1.3.0 | 2026-11-03 | Densidades finales de partículas y comportamientos precisados del motor | Propuestas del Agente Motor, aceptadas |
 | 1.2.0 | 2026-11-02 | `label` en `/config`; `seed` en jobs; códigos de error añadidos; `stage: done`; `null` en tiempos sin medir; fechas con milisegundos; marca del `metrics.json` dummy | Propuestas del Agente Backend, aceptadas |
 | 1.1.0 | 2026-11-02 | `metrics_test.json` pasa a `metrics.json`; se añaden `hashes.sha256`, modelos dummy en `models/dev/`, evaluación sobre el ONNX y versión fija de OpenCV; se quita `sha256_image` del manifiesto | Aprobación del equipo y flujo de entrenamiento en Colab |

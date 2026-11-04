@@ -8,3 +8,4 @@ Dockerfile text eol=lf
 *.pt binary
 *.png binary
 *.jpg binary
+ml/splits/manifest.csv text eol=lf

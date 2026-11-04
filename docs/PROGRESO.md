@@ -9,8 +9,8 @@ Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una t
 | # | Tarea | Subagente | Estado | Fecha | Ciclos | Evidencia |
 |---|---|---|---|---|---|---|
 | T0 | Plan, estructura y CONTRATOS.md | Orquestador | aprobada | 2026-11-02 | 0 | Aprobación del equipo; `docs/PLAN.md`, `docs/CONTRATOS.md` v1.1.0 |
-| T1 | Dataset, remapeo, partición, búsqueda de fuego | ML | en curso | 2026-11-02 | 0 | |
-| T2 | Notebook, evaluación, exportación; entrenamiento lo ejecuta Erika Bonilla en Colab | ML + Erika | en curso | 2026-11-02 | 0 | |
+| T1 | Dataset, remapeo, partición, búsqueda de fuego | ML | aprobada | 2026-11-03 | 0 | Orquestador: 15 119 imágenes, sin solapes entre particiones, hash `fb8a7cc4…` comprobado; 53 pruebas pasadas |
+| T2 | Notebook, evaluación, exportación; entrenamiento lo ejecuta Erika Bonilla en Colab | ML + Erika | en curso (notebook aprobado en CPU; **sin probar en Colab**; falta el entrenamiento real) | 2026-11-03 | 0 | Orquestador: notebook ejecutado en SMOKE_TEST en carpeta limpia (2 min 48 s), 5 archivos válidos. Cifras de humo: no son resultados del modelo |
 | T3 | API, validaciones, inferencia, jobs, modelo dummy | Backend | aprobada (Fase 1; se repite con el modelo real en la Fase 2) | 2026-11-03 | 1 | Orquestador: pytest 220 pasadas, 0 omitidas, con FFmpeg real; flujo real con uvicorn hasta MP4/GIF válidos; `/analyze` 1080p 999 ms **con modelo dummy** |
 | T4 | Efectos, parallax, partículas, moods, video | Motor | aprobada (Fase 1; falta revisión humana de los MP4 en movimiento) | 2026-11-03 | 1 | Orquestador: motor 108 pruebas y backend 220 pasadas; por API real con CPU al 74 % y modelo dummy, 48 frames en 13,1 s de render (antes 29,5 s), es decir, unos 26 s por 96 frames, cifra extrapolada; revisión de hojas de contacto. Máscaras de prueba, no del modelo real |
 | T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | en curso | 2026-11-02 | 0 | |
@@ -35,6 +35,8 @@ Las decisiones marcadas "propuesta" quedaron aprobadas por el equipo el 2026-11-
 | 8 | Trazos JSON para el pincel | Llevan la zona y la dirección en un solo campo | propuesta |
 | 9 | Despliegue de CI en un clúster k3d temporal | El runner no alcanza el portátil; así el smoke test es real | propuesta |
 | 10 | Nginx en el puerto 80 sin root mediante un sysctl de pod | Cumple a la vez "puerto 80" y `runAsNonRoot` | propuesta |
+| 11 | BoWFire como fuente de fuego (119 imágenes), con el resto de cada imagen ignorado | Es el único candidato a nivel de suelo con máscaras manuales y descarga libre. Su README indica Creative Commons de Flickr y pide citar; no especifica la variante por imagen, así que se usa solo en este proyecto académico, sin redistribuir las fotos. No citarlo como MIT | aprobada 2026-11-03 |
+| 12 | Grupos manuales de escena en BoWFire | 33 imágenes son del mismo patio de entrenamiento: una misma escena no puede quedar en dos particiones, o la prueba se contaminaría | aprobada 2026-11-03 |
 
 ## Riesgos abiertos
 
@@ -42,7 +44,7 @@ La tabla completa, con su mitigación, está en [PLAN.md](PLAN.md#6-riesgos).
 
 | Riesgo | Estado | Próxima revisión |
 |---|---|---|
-| Fuego sin datos etiquetados | Abierto; decisión D2 | 5 nov |
+| Fuego con pocos datos (119 imágenes; casi sin fogatas, sin velas ni chimeneas vistas) | Mitigado con BoWFire; el riesgo restante se declara en la demo | 11 nov |
 | mIoU por debajo de 0.55 | Abierto | 11 nov |
 | Cortes o cuota de Colab | Abierto | 6 nov |
 | El wifi de la Expo bloquea el QR | Abierto; requiere router propio | 18 nov |

@@ -1,0 +1,34 @@
+=== PRIMERA CORRIDA: 2026-11-04T01:05:29Z (prueba del flujo, no son resultados del modelo)
+$ python ml/train.py --data-root data/processed --out-dir data/resume_demo --epochs 4 --batch-size 4 --num-workers 0 --limit-train 24 --limit-val 8 --device cpu --seed 42
+Particiones: train=24 val=8. La de prueba no se abre aqui.
+Unexpected keys (classifier.bias, classifier.weight, conv_head.bias, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+Pesos por clase (de los pixeles de train): {'fondo': np.float64(0.5), 'cielo': np.float64(1.0), 'agua': np.float64(1.181), 'vegetacion': np.float64(0.766), 'fuego_luz': np.float64(1.031), 'persona': np.float64(0.902), 'animal': np.float64(1.391)}
+Sin checkpoint previo: empiezo desde la epoca 1.
+Epoca 1/4 | train loss 2.3096 mIoU 0.0343 | val loss 3.7567 mIoU 0.0327 | mejor 0.0327 (epoca 1) | sin mejora 0/8 | tiempo medido 8.6 s | restante estimado si no hay early stopping: 0.4 min | checkpoint guardado
+Epoca 2/4 | train loss 1.5332 mIoU 0.1154 | val loss 3.4649 mIoU 0.0765 | mejor 0.0765 (epoca 2) | sin mejora 0/8 | tiempo medido 7.3 s | restante estimado si no hay early stopping: 0.3 min | checkpoint guardado
+=== MATO EL PROCESO a mitad de la epoca 3: taskkill /F /T /PID 42212 2026-11-04T01:06:09Z
+CORRECTO: el proceso con PID 23316 (proceso secundario de PID 42212)
+ha sido terminado.
+CORRECTO: el proceso con PID 42212 (proceso secundario de PID 30976)
+ha sido terminado.
+codigo de salida del proceso matado: 1
+total 137193
+drwxr-xr-x 1 DELL 197121        0 Nov  3 20:06 .
+drwxr-xr-x 1 DELL 197121        0 Nov  3 20:05 ..
+-rw-r--r-- 1 DELL 197121      260 Nov  3 20:05 class_weights.json
+-rw-r--r-- 1 DELL 197121     1303 Nov  3 20:06 history.json
+-rw-r--r-- 1 DELL 197121 26971812 Nov  3 20:06 kinetia_seg.pt
+-rw-r--r-- 1 DELL 197121 56749792 Nov  3 20:06 last.ckpt
+-rw-r--r-- 1 DELL 197121 56749600 Nov  3 20:05 last.prev.ckpt
+checkpoint: epocas completas 2 | mejor mIoU 0.07646063816366637 | sin mejora 0 | historial [1, 2] | terminado False
+=== REANUDO con el MISMO comando, sin editar nada: 2026-11-04T01:06:14Z
+Particiones: train=24 val=8. La de prueba no se abre aqui.
+Unexpected keys (classifier.bias, classifier.weight, conv_head.bias, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+Pesos por clase (de los pixeles de train): {'fondo': np.float64(0.5), 'cielo': np.float64(1.0), 'agua': np.float64(1.181), 'vegetacion': np.float64(0.766), 'fuego_luz': np.float64(1.031), 'persona': np.float64(0.902), 'animal': np.float64(1.391)}
+Checkpoint encontrado: data\resume_demo\last.ckpt (epocas completas: 2)
+REANUDANDO: continuo en la epoca 3 de 4; mejor mIoU de val: 0.0765; epocas sin mejora: 0
+Epoca 3/4 | train loss 0.3371 mIoU 0.1358 | val loss 2.7929 mIoU 0.0742 | mejor 0.0765 (epoca 2) | sin mejora 1/8 | tiempo medido 11.1 s | restante estimado si no hay early stopping: 0.1 min | checkpoint guardado
+Epoca 4/4 | train loss 1.2053 mIoU 0.1076 | val loss 2.6717 mIoU 0.0688 | mejor 0.0765 (epoca 2) | sin mejora 2/8 | tiempo medido 9.8 s | restante estimado si no hay early stopping: 0.0 min | checkpoint guardado
+Fin. Mejor mIoU de validacion: 0.0765 en la epoca 2.
+codigo de salida: 0
+checkpoint: epocas completas 4 | mejor mIoU 0.07646063816366637 | sin mejora 2 | historial [1, 2, 3, 4] | terminado True
