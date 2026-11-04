@@ -11,7 +11,8 @@ timm==1.0.12  # colab
 # timm 1.0.12 no funciona con huggingface_hub 2.x: no encuentra los pesos preentrenados.
 huggingface_hub==0.26.5  # colab
 albumentations==1.4.24  # colab
-onnx==1.17.0  # colab
+# onnx 1.17 no tiene versión para Python 3.13, que es el de Colab. onnx 1.18 sirve para 3.11 y 3.13.
+onnx==1.18.0  # colab
 onnxruntime==1.20.1  # colab
 pyyaml==6.0.2
 matplotlib==3.9.3

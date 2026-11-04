@@ -192,7 +192,9 @@ if missing:
     print("Instalando:", missing)
     if IN_COLAB and any(p.startswith("opencv") for p in missing):
         subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "opencv-python", "opencv-contrib-python", "opencv-python-headless"], check=False)
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", *missing])
+    result = subprocess.run([sys.executable, "-m", "pip", "install", "-q", *missing], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("pip no pudo instalar las dependencias. Envía este mensaje al orquestador:\\n" + (result.stdout + result.stderr)[-3000:])
 else:
     print("Dependencias ya instaladas.")
 
