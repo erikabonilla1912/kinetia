@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.angular/
+.screenshots/
+.vscode/
+e2e/
+coverage/
+data/
+samples_output/
+*.log
+.env
+.env.*

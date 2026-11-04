@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kinetia
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+# Los nombres son los del contrato (sin sufijo de hash). demo.ps1 fuerza el reinicio con una anotación.
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: kinetia-config
+    envs:
+      - config.env
+  - name: kinetia-model-hashes
+    envs:
+      - model-hashes.env

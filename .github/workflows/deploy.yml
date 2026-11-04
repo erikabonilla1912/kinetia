@@ -1,0 +1,107 @@
+# Despliegue real en un clúster k3d temporal dentro del runner (docs/PLAN.md, sección 7).
+# No actualiza el portátil de la Expo: GitHub Actions no puede alcanzarlo.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  MODELS_RELEASE_TAG: ${{ vars.MODELS_RELEASE_TAG || 'models-latest' }}
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  K3D_VERSION: v5.9.0
+  K3S_IMAGE: rancher/k3s:v1.35.5-k3s1
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - name: Instalar k3d
+        run: |
+          curl -fsSL -o /tmp/k3d "https://github.com/k3d-io/k3d/releases/download/$K3D_VERSION/k3d-linux-amd64"
+          sudo install -m 0755 /tmp/k3d /usr/local/bin/k3d
+          k3d version
+      - name: Crear el clúster temporal
+        run: k3d cluster create kinetia --image "$K3S_IMAGE" -p "8080:30080@server:0" --k3s-arg "--disable-cloud-controller@server:0" --wait --timeout 180s
+      - name: Comprobar los manifiestos contra el API server real
+        run: |
+          kubectl create namespace kinetia --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -k k8s/overlays/local --dry-run=server
+      - name: Buscar el Release de modelos
+        id: models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$MODELS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            message="OMITIDO: no existe el Release '$MODELS_RELEASE_TAG'. Sin modelos el pod no puede arrancar, así que NO se desplegó el pod ni se ejecutó el smoke a /api/v1/health. Solo se validaron los manifiestos contra el API server (dry-run). Esto no es un despliegue exitoso."
+            echo "::warning title=Despliegue omitido::$message"
+            echo "### Despliegue omitido" >> "$GITHUB_STEP_SUMMARY"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: docker/login-action@v3
+        if: steps.models.outputs.available == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Importar imágenes por SHA
+        if: steps.models.outputs.available == 'true'
+        run: |
+          for name in kinetia-api kinetia-frontend kinetia-model-loader; do
+            docker pull "$REGISTRY/$name:$SHA"
+            k3d image import "$REGISTRY/$name:$SHA" -c kinetia
+          done
+      - name: Aplicar con kubectl apply -k
+        if: steps.models.outputs.available == 'true'
+        run: |
+          kubectl -n kinetia create secret generic kinetia-secret --from-literal=ADMIN_TOKEN="$(openssl rand -hex 24)"
+          overlay="$(mktemp -d)"
+          cp -r k8s "$overlay/k8s"
+          cat > "$overlay/kustomization.yaml" <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          resources:
+            - k8s/overlays/local
+          images:
+            - name: ghcr.io/erikabonilla1912/kinetia-api
+              newName: $REGISTRY/kinetia-api
+              newTag: "$SHA"
+            - name: ghcr.io/erikabonilla1912/kinetia-frontend
+              newName: $REGISTRY/kinetia-frontend
+              newTag: "$SHA"
+            - name: ghcr.io/erikabonilla1912/kinetia-model-loader
+              newName: $REGISTRY/kinetia-model-loader
+              newTag: "$SHA"
+          EOF
+          kubectl apply -k "$overlay"
+      - name: Esperar el pod
+        if: steps.models.outputs.available == 'true'
+        run: kubectl -n kinetia rollout status deploy/kinetia --timeout=300s
+      - name: Smoke a /api/v1/health
+        if: steps.models.outputs.available == 'true'
+        run: python3 tests/smoke/smoke.py --base-url http://localhost:8080 --health-only
+      - name: Diagnóstico si algo falla
+        if: failure()
+        run: |
+          kubectl get all -A || true
+          kubectl -n kinetia describe pods || true
+          kubectl -n kinetia logs deploy/kinetia --all-containers --tail=100 || true
+      - name: Borrar el clúster
+        if: always()
+        run: k3d cluster delete kinetia || true

@@ -1,0 +1,83 @@
+# Plan C (docs/CONTRATOS.md, sección 7): las mismas imágenes, sin Kubernetes. Se inicia con `make planc`.
+# La configuración sale de los mismos archivos que los ConfigMap de k8s/base.
+name: kinetia
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  model-loader:
+    <<: *hardening
+    image: ${KINETIA_REGISTRY:-ghcr.io/erikabonilla1912}/kinetia-model-loader:${KINETIA_TAG:-local}
+    build:
+      context: .
+      dockerfile: model-loader/Dockerfile
+      args:
+        MODELS_SRC: ${MODELS_SRC:-models}
+    user: "1000:1000"
+    env_file:
+      - k8s/base/model-hashes.env
+    environment:
+      MODELS_DIR: /models
+    volumes:
+      - models:/models
+    restart: "no"
+
+  api:
+    <<: *hardening
+    image: ${KINETIA_REGISTRY:-ghcr.io/erikabonilla1912}/kinetia-api:${KINETIA_TAG:-local}
+    build: ./backend
+    user: "1000:1000"
+    depends_on:
+      model-loader:
+        condition: service_completed_successfully
+    env_file:
+      - k8s/base/config.env
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    # La red es de este servicio: el sysctl y el puerto publicado se declaran aquí.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "80"
+    ports:
+      - "8080:80"
+    volumes:
+      - models:/models:ro
+      - results:/data/results
+      - db:/data/db
+      - shared-tmp:/shared-tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+    restart: unless-stopped
+
+  frontend:
+    <<: *hardening
+    image: ${KINETIA_REGISTRY:-ghcr.io/erikabonilla1912}/kinetia-frontend:${KINETIA_TAG:-local}
+    build: ./frontend
+    user: "101:101"
+    network_mode: "service:api"
+    depends_on:
+      api:
+        condition: service_started
+    tmpfs:
+      - /var/cache/nginx:mode=1777
+      - /var/run:mode=1777
+    volumes:
+      - shared-tmp:/shared-tmp
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  models:
+  results:
+  db:
+  shared-tmp:

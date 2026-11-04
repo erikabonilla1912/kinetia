@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinetia
+  labels:
+    app: kinetia
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: kinetia
+  template:
+    metadata:
+      labels:
+        app: kinetia
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: "80"
+      initContainers:
+        - name: model-loader
+          image: ghcr.io/erikabonilla1912/kinetia-model-loader:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MODELS_DIR
+              value: /models
+          envFrom:
+            - configMapRef:
+                name: kinetia-model-hashes
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources: # PROVISIONAL
+            requests:
+              cpu: 100m # PROVISIONAL
+              memory: 64Mi # PROVISIONAL
+            limits:
+              cpu: "1" # PROVISIONAL
+              memory: 256Mi # PROVISIONAL
+          volumeMounts:
+            - name: kinetia-data
+              mountPath: /models
+              subPath: models
+      containers:
+        - name: frontend
+          image: ghcr.io/erikabonilla1912/kinetia-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources: # PROVISIONAL
+            requests:
+              cpu: 50m # PROVISIONAL
+              memory: 32Mi # PROVISIONAL
+            limits:
+              cpu: 500m # PROVISIONAL
+              memory: 128Mi # PROVISIONAL
+          volumeMounts:
+            - name: shared-tmp
+              mountPath: /shared-tmp
+            - name: nginx-run
+              mountPath: /var/cache/nginx
+              subPath: cache
+            - name: nginx-run
+              mountPath: /var/run
+              subPath: run
+        - name: api
+          image: ghcr.io/erikabonilla1912/kinetia-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: api
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: kinetia-config
+          env:
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kinetia-secret
+                  key: ADMIN_TOKEN
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources: # PROVISIONAL
+            requests:
+              cpu: 500m # PROVISIONAL
+              memory: 512Mi # PROVISIONAL
+            limits:
+              cpu: "4" # PROVISIONAL
+              memory: 3Gi # PROVISIONAL
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 8000
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: kinetia-data
+              mountPath: /models
+              subPath: models
+              readOnly: true
+            - name: kinetia-data
+              mountPath: /data/results
+              subPath: results
+            - name: kinetia-data
+              mountPath: /data/db
+              subPath: db
+            - name: shared-tmp
+              mountPath: /shared-tmp
+      volumes:
+        - name: kinetia-data
+          persistentVolumeClaim:
+            claimName: kinetia-data
+        - name: shared-tmp
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: nginx-run
+          emptyDir: {}

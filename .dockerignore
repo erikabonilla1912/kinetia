@@ -1,0 +1,21 @@
+# Contexto de la imagen model-loader: solo necesita model-loader/ y una carpeta de modelos.
+**/.venv*/
+**/node_modules/
+**/__pycache__/
+**/*.pt
+**/*.pth
+**/*.ckpt
+.git/
+.github/
+data/
+samples_output/
+notebooks/
+backend/
+frontend/
+ml/
+docs/
+k8s/
+scripts/
+tests/
+.env
+.env.*

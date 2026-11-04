@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  # Tag del GitHub Release con los modelos (kinetia_seg.onnx, midas_small.onnx, manifest.json, metrics.json).
+  MODELS_RELEASE_TAG: ${{ vars.MODELS_RELEASE_TAG || 'models-latest' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ruff (errores reales de Python)
+        run: |
+          pip install ruff==0.8.6
+          ruff check --select E9,F --per-file-ignores "backend/tests/*:F401" backend tests/smoke
+      - name: Sin modelos dummy en lo versionado
+        run: |
+          if grep -rnEi 'ALLOW_DUMMY_MODEL[:= "]*true|dummy-dev' k8s docker-compose.yml; then
+            echo "::error::Valores dummy en k8s/ o docker-compose.yml"
+            exit 1
+          fi
+
+  backend-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Instalar ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Instalar dependencias
+        run: pip install -r backend/requirements-dev.txt
+      - name: Pytest de la API
+        working-directory: backend
+        run: python -m pytest tests -q
+      - name: Pytest del motor de animación
+        working-directory: backend
+        run: python -m pytest animation_engine/tests -q
+
+  frontend-tests:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # Chrome del sistema: Ubuntu 24.04 trae el perfil de AppArmor /etc/apparmor.d/chrome, que solo
+      # concede user namespaces a /opt/google/chrome/chrome. No hace falta relajar nada en el kernel.
+      - name: Pruebas unitarias
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: npm test
+      - name: Build de producción
+        run: npm run build
+
+  manifests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Renderizar y validar con kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          for overlay in local cloud; do
+            echo "--- overlays/$overlay"
+            kubectl kustomize "k8s/overlays/$overlay" | ./kubeconform -strict -summary -kubernetes-version 1.33.0 -
+          done
+      - name: Validar docker-compose.yml
+        run: docker compose config --quiet
+
+  images:
+    needs: [lint, backend-tests, frontend-tests, manifests]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Construir y publicar la API
+        run: |
+          docker build -t "$REGISTRY/kinetia-api:$GITHUB_SHA" backend
+          docker push "$REGISTRY/kinetia-api:$GITHUB_SHA"
+      - name: Construir y publicar el frontend
+        run: |
+          docker build -t "$REGISTRY/kinetia-frontend:$GITHUB_SHA" frontend
+          docker push "$REGISTRY/kinetia-frontend:$GITHUB_SHA"
+      - name: Buscar el Release de modelos
+        id: models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$MODELS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            message="OMITIDO: no existe el Release '$MODELS_RELEASE_TAG'. La imagen model-loader NO se construyó ni se publicó. Se activará sola al crear ese Release."
+            echo "::warning title=model-loader omitido::$message"
+            echo "### model-loader omitido" >> "$GITHUB_STEP_SUMMARY"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Construir y publicar model-loader
+        if: steps.models.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$MODELS_RELEASE_TAG" --dir models \
+            --pattern kinetia_seg.onnx --pattern midas_small.onnx --pattern manifest.json --pattern metrics.json
+          . k8s/base/model-hashes.env
+          echo "$EXPECTED_SHA256_SEG  models/kinetia_seg.onnx" | sha256sum -c -
+          echo "$EXPECTED_SHA256_DEPTH  models/midas_small.onnx" | sha256sum -c -
+          docker build -t "$REGISTRY/kinetia-model-loader:$GITHUB_SHA" -f model-loader/Dockerfile .
+          docker push "$REGISTRY/kinetia-model-loader:$GITHUB_SHA"

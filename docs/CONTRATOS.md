@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.5.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.6.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -498,7 +498,7 @@ Son valores de partida, ajustables por el Agente Motor tras verlos en pantalla. 
   - `location /api/` hace proxy a `http://127.0.0.1:8000`.
   - Rutas desconocidas vuelven a `index.html`.
   - `client_max_body_size 20m`, mayor que el límite de la API, para que el 413 lo responda la API en JSON.
-  - `/metrics` **no** se publica a través de Nginx.
+  - `/metrics` **no** se publica a través de Nginx: `location = /metrics { return 404; }`, porque si no el fallback a `index.html` respondería 200.
   - `proxy_read_timeout 120s`.
 
 ### Volúmenes
@@ -527,6 +527,10 @@ Nginx guarda en `/shared-tmp/nginx` los cuerpos de subida en tránsito. La API u
 | `kinetia-model-hashes` | ConfigMap | Hashes esperados, generado desde `k8s/base/model-hashes.env` |
 | `kinetia-secret` | Secret | Se crea con un script desde `.env`; nunca se versiona |
 | `kinetia-data` | PersistentVolumeClaim | 5 Gi, RWO |
+
+**Clúster k3d:** k3s se arranca con `--disable-cloud-controller`, porque `cloud-controller-manager` provocaba un bucle de reinicios del nodo en k3s v1.35.5 (causa raíz sin determinar). El mapeo de puertos requiere el proxy de k3d. Los modelos del CI se descargan del Release indicado en la variable de repositorio `MODELS_RELEASE_TAG` (`models-latest` por defecto).
+
+**Modelos antiguos en el PVC:** si el hash del volumen no coincide con el ConfigMap y el de la imagen sí, `model-loader` reemplaza el archivo del volumen y vuelve a verificar. Pendiente de implementar al integrar el modelo real.
 
 **Exposición local (k3d):** `-p "8080:30080@server:0"`, es decir, `http://<IP-del-portátil>:8080`. El QR usa la **IP**, porque los celulares no resuelven `kinetia.local`.
 
@@ -595,6 +599,7 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.6.0 | 2026-11-04 | `/metrics` en Nginx, bandera de k3s, Release de modelos y reemplazo de modelos antiguos en el PVC | Propuestas del Agente DevOps |
 | 1.5.0 | 2026-11-03 | Ruta `/modelo` y botón de galería en el frontend | Propuestas del Agente Frontend. Pendientes para la Fase 2: límites de duración, pincel y `max_pixels` en `/config`, y `queue_position` en jobs |
 | 1.4.0 | 2026-11-03 | BoWFire como fuente de fuego, con su limitación; valores de `source`; definición del hash del manifiesto y de las métricas | Decisión D2 y propuestas del Agente ML |
 | 1.3.0 | 2026-11-03 | Densidades finales de partículas y comportamientos precisados del motor | Propuestas del Agente Motor, aceptadas |

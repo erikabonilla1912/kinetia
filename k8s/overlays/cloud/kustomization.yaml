@@ -1,0 +1,16 @@
+# OPCIONAL Y NO PROBADO: no se ha desplegado en ninguna nube. La demo usa overlays/local.
+# Punto de partida mínimo: sin Ingress y con un Service LoadBalancer en lugar de NodePort.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: Service
+      name: kinetia
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer
+      - op: remove
+        path: /spec/ports/0/nodePort
