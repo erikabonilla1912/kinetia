@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.1.0 (aprobada por el equipo) · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.2.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -84,6 +84,7 @@ Solo se usa para el parallax. Es una medida relativa: no sirve para medir distan
 - `ml/make_dummy_model.py` genera en `models/dev/` (fuera de git) un `kinetia_seg.onnx` y un `midas_small.onnx` con las firmas de esta sección, pesos aleatorios y `version = "dummy-dev"` en su `manifest.json`. Solo necesita `onnx` y `numpy`, no PyTorch. En desarrollo: `MODELS_DIR=models/dev`.
 - La API **se niega a arrancar** con él salvo que `ALLOW_DUMMY_MODEL=true`. Ese valor está prohibido en `k8s/` y en `docker-compose.yml`, y QA lo verifica.
 - Con el dummy, `/api/v1/analyze` devuelve `model_version: "dummy-dev"` y la UI muestra un aviso visible.
+- Su `metrics.json` lleva además `dummy: true` y `split: "dummy"`. Si la UI ve esos campos, muestra que no son resultados del modelo.
 
 ---
 
@@ -158,7 +159,7 @@ Los binarios no se versionan en git. Se publican como asset de un GitHub Release
 
 ## 4. API
 
-**Base:** `/api/v1`. Todo es JSON, salvo las subidas (`multipart/form-data`) y `/metrics`. Las fechas van en ISO 8601 UTC.
+**Base:** `/api/v1`. Todo es JSON, salvo las subidas (`multipart/form-data`) y `/metrics`. Las fechas van en ISO 8601 UTC con milisegundos (`2026-11-25T15:00:00.123Z`), para que `after` en la galería no pierda jobs creados en el mismo segundo.
 
 ### Formato único de error
 
@@ -186,6 +187,11 @@ Los binarios no se versionan en git. Se publican como asset de un GitHub Release
 | 429 | `QUEUE_FULL` | Cola con `MAX_QUEUE` jobs. Incluye la cabecera `Retry-After` |
 | 503 | `MODEL_NOT_READY` | El modelo aún no está cargado |
 | 500 | `INTERNAL_ERROR` | Error inesperado, sin traza en la respuesta (la traza va al log) |
+| 404 | `NOT_FOUND` | Ruta inexistente |
+| 405 | `METHOD_NOT_ALLOWED` | Método no permitido en esa ruta |
+| 416 | `RANGE_NOT_SATISFIABLE` | Cabecera `Range` fuera del archivo |
+
+Solo dentro de `error` de un job fallido: `JOB_INTERRUPTED`, `ENGINE_UNAVAILABLE`, `ENCODER_UNAVAILABLE`.
 
 **Validación:** el formato se decide por **magic bytes**, nunca por la extensión ni por el `Content-Type`. Los errores se comprueban en este orden: tamaño, formato, decodificación, resolución, duración.
 
@@ -267,9 +273,10 @@ La máscara viaja como **trazos vectoriales** y no como PNG, porque cada trazo d
 {
   "job_id": "<uuid>",
   "status": "succeeded",
-  "stage": "encoding",
+  "stage": "done",
   "progress": 1.0,
   "mood": "calma",
+  "seed": 5,
   "created_at": "2026-11-25T15:00:00Z",
   "updated_at": "2026-11-25T15:00:21Z",
   "result": {
@@ -289,6 +296,7 @@ La máscara viaja como **trazos vectoriales** y no como PNG, porque cada trazo d
 - `status`: `queued`, `running`, `succeeded`, `failed`.
 - `stage`: `queued`, `segmenting`, `depth`, `rendering`, `encoding`, `done`.
 - Si falla, `result` es `null` y `error` tiene la forma `{ "code", "message" }`.
+- En `timings_ms`, una etapa aún no medida vale `null`, nunca 0.
 - Un job que estaba en curso cuando se reinició el pod queda en `failed` con código `JOB_INTERRUPTED`.
 - El frontend consulta cada 1 s mientras el job no termine.
 
@@ -308,7 +316,7 @@ Son necesarios para cumplir las funciones pedidas (resultado, QR, galería).
 | Endpoint | Para qué | Respuesta |
 |---|---|---|
 | `GET /api/v1/results/{job_id}.{ext}` | Descargar o reproducir. **Debe soportar cabeceras `Range`**: Safari en iPhone no reproduce video sin ellas | Binario, `video/mp4` o `image/gif` |
-| `GET /api/v1/config` | Configuración pública para el frontend y el QR | `{ "public_base_url": "http://192.168.0.10:8080", "limits": { "max_upload_bytes": 15728640, "max_video_seconds": 10, "min_side_px": 256, "formats": ["jpg","png","webp","mp4","mov"] }, "moods": ["calma","epico","magico","nostalgico"], "classes": [{ "id": 0, "name": "fondo", "color": "#3A3F4B" }] }` |
+| `GET /api/v1/config` | Configuración pública para el frontend y el QR | `{ "public_base_url": "http://192.168.0.10:8080", "limits": { "max_upload_bytes": 15728640, "max_video_seconds": 10, "min_side_px": 256, "formats": ["jpg","png","webp","mp4","mov"] }, "moods": ["calma","epico","magico","nostalgico"], "classes": [{ "id": 0, "name": "fondo", "label": "Fondo", "color": "#3A3F4B" }] }` |
 | `GET /api/v1/gallery?limit=24&after=<ISO>` | Pantalla grande | `{ "items": [{ "job_id": "<uuid>", "mood": "calma", "result_url": "/api/v1/results/<uuid>.mp4", "created_at": "<ISO>" }] }`. Solo jobs con `gallery_opt_in=true`, en orden del más reciente al más antiguo |
 | `DELETE /api/v1/gallery/{job_id}` | Moderación durante la Expo. Requiere la cabecera `X-Admin-Token` | **204** |
 
@@ -570,4 +578,5 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.2.0 | 2026-11-02 | `label` en `/config`; `seed` en jobs; códigos de error añadidos; `stage: done`; `null` en tiempos sin medir; fechas con milisegundos; marca del `metrics.json` dummy | Propuestas del Agente Backend, aceptadas |
 | 1.1.0 | 2026-11-02 | `metrics_test.json` pasa a `metrics.json`; se añaden `hashes.sha256`, modelos dummy en `models/dev/`, evaluación sobre el ONNX y versión fija de OpenCV; se quita `sha256_image` del manifiesto | Aprobación del equipo y flujo de entrenamiento en Colab |

@@ -1,0 +1,5 @@
+# Pruebas y generación de modelos dummy. No entra en la imagen de producción.
+-r requirements.txt
+pytest==8.3.4
+httpx==0.27.2
+onnx==1.17.0

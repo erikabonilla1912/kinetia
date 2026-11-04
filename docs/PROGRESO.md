@@ -1,6 +1,6 @@
 # KINETIA — Registro de avance
 
-**Última actualización:** 2026-11-02 · **Fase actual:** 0, esperando aprobación
+**Última actualización:** 2026-11-02 · **Fase actual:** 1, en curso (plan aprobado por el equipo el 2026-11-02)
 
 Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una tarea solo pasa a `aprobada` con evidencia que el orquestador haya verificado.
 
@@ -8,12 +8,12 @@ Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una t
 
 | # | Tarea | Subagente | Estado | Fecha | Ciclos | Evidencia |
 |---|---|---|---|---|---|---|
-| T0 | Plan, estructura y CONTRATOS.md | Orquestador | en revisión | 2026-11-02 | 0 | `docs/PLAN.md`, `docs/CONTRATOS.md` |
-| T1 | Dataset, remapeo, partición, dummy | ML | pendiente | | 0 | |
-| T2 | Notebook, entrenamiento, evaluación, exportación | ML + equipo en Colab | pendiente | | 0 | |
-| T3 | API, validaciones, inferencia, jobs | Backend | pendiente | | 0 | |
-| T4 | Efectos, parallax, partículas, moods, video | Motor | pendiente | | 0 | |
-| T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | pendiente | | 0 | |
+| T0 | Plan, estructura y CONTRATOS.md | Orquestador | aprobada | 2026-11-02 | 0 | Aprobación del equipo; `docs/PLAN.md`, `docs/CONTRATOS.md` v1.1.0 |
+| T1 | Dataset, remapeo, partición, búsqueda de fuego | ML | en curso | 2026-11-02 | 0 | |
+| T2 | Notebook, evaluación, exportación; entrenamiento lo ejecuta Erika Bonilla en Colab | ML + Erika | en curso | 2026-11-02 | 0 | |
+| T3 | API, validaciones, inferencia, jobs, modelo dummy | Backend | aprobada (Fase 1; se repite con el modelo real en la Fase 2) | 2026-11-03 | 1 | Orquestador: pytest 220 pasadas, 0 omitidas, con FFmpeg real; flujo real con uvicorn hasta MP4/GIF válidos; `/analyze` 1080p 999 ms **con modelo dummy** |
+| T4 | Efectos, parallax, partículas, moods, video | Motor | en curso | 2026-11-02 | 0 | |
+| T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | en curso | 2026-11-02 | 0 | |
 | T6 | Pruebas de API, modelo, rendimiento y frontend | QA | pendiente | | 0 | |
 | T7 | Docker, Kubernetes, CI/CD, monitoreo, `make demo` | DevOps | pendiente | | 0 | |
 | T8 | Documento técnico, diagramas, README, guion, preguntas | Documentación | pendiente | | 0 | |
@@ -21,7 +21,7 @@ Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una t
 
 ## Decisiones técnicas
 
-Estado "propuesta" hasta que el equipo apruebe el plan.
+Las decisiones marcadas "propuesta" quedaron aprobadas por el equipo el 2026-11-02, junto con el plan.
 
 | # | Decisión | Justificación | Estado |
 |---|---|---|---|
