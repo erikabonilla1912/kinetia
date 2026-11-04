@@ -14,27 +14,51 @@ fail() {
 [ -n "${EXPECTED_SHA256_SEG:-}" ] || fail "falta EXPECTED_SHA256_SEG"
 [ -n "${EXPECTED_SHA256_DEPTH:-}" ] || fail "falta EXPECTED_SHA256_DEPTH"
 
+# Copia atómica: un corte a medias no deja un archivo truncado con el nombre final.
+install_from_image() {
+    cp "$IMAGE_DIR/$1" "$MODELS_DIR/.$1.tmp"
+    mv "$MODELS_DIR/.$1.tmp" "$MODELS_DIR/$1"
+}
+
 for name in kinetia_seg.onnx midas_small.onnx manifest.json metrics.json; do
     if [ ! -f "$MODELS_DIR/$name" ]; then
         echo "model-loader: copiando $name al volumen"
-        # Copia atómica: un corte a medias no deja un archivo truncado con el nombre final.
-        cp "$IMAGE_DIR/$name" "$MODELS_DIR/.$name.tmp"
-        mv "$MODELS_DIR/.$name.tmp" "$MODELS_DIR/$name"
+        install_from_image "$name"
     fi
 done
+
+sha_of() {
+    sha256sum "$1" | cut -d' ' -f1
+}
+
+# Devuelve 0 si reemplazó un modelo antiguo del volumen por el de la imagen.
+replace_stale() {
+    name="$1"
+    expected="$2"
+    actual="$(sha_of "$MODELS_DIR/$name")"
+    [ "$actual" != "$expected" ] || return 1
+    [ "$(sha_of "$IMAGE_DIR/$name")" = "$expected" ] || return 1
+    echo "model-loader: $name: el volumen conserva un modelo anterior ($actual); lo reemplazo por el de la imagen"
+    install_from_image "$name"
+}
+
+# Las métricas y el manifiesto describen al modelo: si cambia, se reemplazan con él.
+seg_replaced=false
+if replace_stale kinetia_seg.onnx "$EXPECTED_SHA256_SEG"; then
+    seg_replaced=true
+fi
+replace_stale midas_small.onnx "$EXPECTED_SHA256_DEPTH" || true
+if [ "$seg_replaced" = true ]; then
+    install_from_image manifest.json
+    install_from_image metrics.json
+fi
 
 check() {
     name="$1"
     expected="$2"
-    actual="$(sha256sum "$MODELS_DIR/$name" | cut -d' ' -f1)"
+    actual="$(sha_of "$MODELS_DIR/$name")"
     if [ "$actual" != "$expected" ]; then
-        echo "model-loader: $name: esperado $expected, obtenido $actual" >&2
-        image="$(sha256sum "$IMAGE_DIR/$name" | cut -d' ' -f1)"
-        if [ "$image" = "$expected" ]; then
-            echo "model-loader: la imagen trae el archivo correcto, pero el volumen conserva uno anterior." >&2
-            echo "model-loader: ejecuta 'make down' y 'make demo' para recrear el volumen." >&2
-        fi
-        fail "SHA-256 incorrecto en $name"
+        fail "SHA-256 incorrecto en $name: esperado $expected, obtenido $actual"
     fi
     echo "model-loader: $name OK ($actual)"
 }

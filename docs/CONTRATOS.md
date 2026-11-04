@@ -532,7 +532,7 @@ Nginx guarda en `/shared-tmp/nginx` los cuerpos de subida en tránsito. La API u
 
 **Clúster k3d:** k3s se arranca con `--disable-cloud-controller`, porque `cloud-controller-manager` provocaba un bucle de reinicios del nodo en k3s v1.35.5 (causa raíz sin determinar). El mapeo de puertos requiere el proxy de k3d. Los modelos del CI se descargan del Release indicado en la variable de repositorio `MODELS_RELEASE_TAG` (`models-latest` por defecto).
 
-**Modelos antiguos en el PVC:** si el hash del volumen no coincide con el ConfigMap y el de la imagen sí, `model-loader` reemplaza el archivo del volumen y vuelve a verificar. Pendiente de implementar al integrar el modelo real.
+**Modelos antiguos en el PVC:** si el hash del volumen no coincide con el ConfigMap y el de la imagen sí, `model-loader` reemplaza el archivo del volumen y vuelve a verificar. Si reemplaza el modelo de segmentación, también reemplaza `manifest.json` y `metrics.json`, porque lo describen. Si tampoco coincide el de la imagen, termina con código 1.
 
 **Exposición local (k3d):** `-p "8080:30080@server:0"`, es decir, `http://<IP-del-portátil>:8080`. El QR usa la **IP**, porque los celulares no resuelven `kinetia.local`.
 
