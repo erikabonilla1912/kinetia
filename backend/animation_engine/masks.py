@@ -198,22 +198,3 @@ def region_plate(image: np.ndarray, region: np.ndarray, erode_px: int = 2, coars
         if eroded.any():
             binary = eroded
     return push_pull_fill(image, binary, coarse)
-
-
-def inpaint_hole(image: np.ndarray, hole: np.ndarray, fast: bool) -> np.ndarray:
-    """Rellena ``hole``. Con ``fast`` usa la pirámide; si no, Telea a media resolución."""
-    binary = (hole > 0).astype(np.uint8)
-    if not binary.any():
-        return image.copy()
-    if fast or float(binary.mean()) > 0.5:
-        return push_pull_fill(image, 1 - binary, fast)
-    h, w = binary.shape
-    small_size = (max(1, w // 2), max(1, h // 2))
-    small = cv2.resize(image, small_size, interpolation=cv2.INTER_AREA)
-    small_hole = (cv2.resize(binary, small_size, interpolation=cv2.INTER_AREA) > 0).astype(np.uint8)
-    filled = cv2.inpaint(small, small_hole * 255, 5, cv2.INPAINT_TELEA)
-    filled = cv2.GaussianBlur(filled, (0, 0), 1.2)
-    up = cv2.resize(filled, (w, h), interpolation=cv2.INTER_LINEAR)
-    out = image.copy()
-    out[binary > 0] = up[binary > 0]
-    return out

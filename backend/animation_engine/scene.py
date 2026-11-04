@@ -13,8 +13,8 @@ from .effects.vegetation import VegetationEffect
 from .effects.water import WaterEffect
 from .grading import Grader
 from .masks import blend
-from .parallax import ParallaxRig
 from .particles import ParticleLayer
+from .subject import SubjectLayer
 from .timing import FrameTime
 
 
@@ -23,12 +23,10 @@ class Scene:
         self,
         image: np.ndarray,
         mask: np.ndarray,
-        depth: Optional[np.ndarray],
         assets: Assets,
         particles: ParticleLayer,
         grader: Grader,
         brush: BrushEffect,
-        fast: bool,
     ) -> None:
         config = assets.config
         self.image = image
@@ -37,13 +35,10 @@ class Scene:
         self.brush = brush
         self.only = config.brush_mode == "only"
 
-        # En modo only no hay parallax: mover la cámara animaría lo no pintado.
-        self.rig: Optional[ParallaxRig] = None
-        if depth is not None and config.mood.parallax_amplitude > 0 and not self.only:
-            self.rig = ParallaxRig(image, mask, depth, assets, fast)
-
+        self.subject: Optional[SubjectLayer] = None
         self.effects = []
         if not self.only:
+            self.subject = SubjectLayer(mask, max(assets.scale, 0.25))
             self.effects = [
                 SkyEffect(image, mask, assets),
                 WaterEffect(image, mask, assets),
@@ -53,21 +48,18 @@ class Scene:
         self.static_graded = grader.apply(image.copy()) if self.only else None
 
     def render(self, ft: FrameTime) -> np.ndarray:
-        source = self.rig.bg_plate if self.rig is not None else self.image
-        canvas = source.copy()
+        canvas = self.image.copy()
         for effect in self.effects:
             effect.apply(canvas, ft)
         if self.brush.active:
-            self.brush.apply(canvas, source, ft)
-        if self.rig is not None:
-            canvas = self.rig.warp_background(canvas, ft)
+            self.brush.apply(canvas, self.image, ft)
         self.particles.render(canvas, ft, front=False)
-        if self.rig is not None and self.rig.has_subject:
-            subject_source = None
+        if self.subject is not None and self.subject.active:
+            source = self.image
             if self.brush.active:
-                subject_source = self.rig.fg_plate.copy()
-                self.brush.apply(subject_source, self.rig.fg_plate, ft)
-            self.rig.composite_subject(canvas, ft, subject_source)
+                source = self.image.copy()
+                self.brush.apply(source, self.image, ft)
+            self.subject.composite(canvas, source)
         self.particles.render(canvas, ft, front=True)
         out = self.grader.apply(canvas)
         if self.only:

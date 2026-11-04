@@ -11,7 +11,7 @@ from ..noise import Wave, WaveBank
 from ..timing import FrameTime, cycles, omega
 
 FEATHER_PX = 6.0
-SWAY_AMPLITUDE_PX = 2.0
+SWAY_AMPLITUDE_PX = 0.7
 
 
 def is_forest(mask: np.ndarray) -> bool:
@@ -64,8 +64,8 @@ class VegetationEffect:
         # Lo alto de la foto (copas) oscila más que lo bajo (pasto, troncos).
         h = assets.shape[0]
         self.amp = self.region.pick((0.55 + 0.75 * (1.0 - y_local / max(h - 1, 1))) * SWAY_AMPLITUDE_PX * sc)
-        self.amps_x = (1.0, 0.75, 0.42, 0.24, 0.16)
-        self.amps_y = (0.25, 0.25, 0.18, 0.12, 0.10)
+        self.amps_x = (1.0, 0.6, 0.0, 0.0, 0.0)
+        self.amps_y = (0.2, 0.15, 0.0, 0.0, 0.0)
         self.amps_shade = (0.0, 0.2, 0.3, 0.35, 0.3)
 
     def apply(self, canvas: np.ndarray, ft: FrameTime) -> None:
@@ -79,4 +79,4 @@ class VegetationEffect:
         )
         # Las hojas cambian de orientación frente a la luz: brillo que va y viene.
         shimmer = up(self.bank.field(ft.t, self.amps_shade, roi, quadrature=True))
-        self.region.composite(canvas, scale_pixels(layer, 1.0 + 0.06 * shimmer))
+        self.region.composite(canvas, scale_pixels(layer, 1.0 + 0.03 * shimmer))

@@ -63,7 +63,7 @@ class FireEffect:
                 self.bank = assets.cached("fire.bank", lambda: _build_bank(assets, None))
             else:
                 self.bank = _build_bank(assets, self.roi)
-        self.amp = 4.0 * sc
+        self.amp = 2.2 * sc
         self.amps_d = (0.8, 1.0, 0.6, 0.3)
         self.amps_gain = (0.35, 0.45, 0.45, 0.3)
 
@@ -99,7 +99,7 @@ class FireEffect:
             self.glow_small.append(glow)
             reach = np.maximum(reach, glow)
             terms = []
-            for base_hz, amp in ((2.3, 0.45), (4.1, 0.30), (7.3, 0.25)):
+            for base_hz, amp in ((1.6, 0.45), (2.9, 0.30), (5.0, 0.25)):
                 c = cycles(base_hz + float(rng.uniform(-0.3, 0.3)), speed, period)
                 terms.append((omega(c, period), amp, float(rng.uniform(0, 2 * np.pi))))
             self.flickers.append(terms)
@@ -129,7 +129,7 @@ class FireEffect:
             return
         total = None
         for glow, terms in zip(self.glow_small, self.flickers):
-            weight = 0.62 + 0.30 * self._flicker(terms, ft.t)
+            weight = 0.62 + 0.22 * self._flicker(terms, ft.t)
             total = glow * weight if total is None else total + glow * weight
         up = cv2.resize(total, self.glow_size, interpolation=cv2.INTER_LINEAR)
         gy0, gy1, gx0, gx1 = self.glow_roi

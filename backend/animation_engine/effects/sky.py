@@ -11,7 +11,7 @@ from ..noise import spectral_noise
 from ..timing import FrameTime, cycles, omega
 
 FEATHER_PX = 10.0
-BASE_DRIFT_PX_S = 26.0
+BASE_DRIFT_PX_S = 11.0
 STAR_GROUPS = 6
 STARS_PER_MEGAPIXEL = 520.0
 
@@ -98,7 +98,7 @@ class SkyEffect:
         y_local = assets.grid_y[y0:y1, x0:x1]
         # Más arriba las nubes parecen más cercanas y se mueven más rápido.
         h = assets.shape[0]
-        profile = 1.45 - 0.9 * np.clip(y_local / max(h * 0.6, 1.0), 0.0, 1.0)
+        profile = 1.15 - 0.3 * np.clip(y_local / max(h * 0.6, 1.0), 0.0, 1.0)
         self.x = self.region.pick(x_local)
         self.y = self.region.pick(y_local)
         self.profile = self.region.pick(profile)

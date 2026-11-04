@@ -41,7 +41,9 @@ class ImageTimeline:
         t = index / self.fps
         start = self.n_frames - self.crossfade_frames
         if self.crossfade_frames > 0 and index >= start:
-            w = (index - start + 1) / (self.crossfade_frames + 1)
+            # Curva suave que llega a 1 en el último frame: ese frame ya es el anterior al primero.
+            x = (index - start + 1) / self.crossfade_frames
+            w = x * x * (3.0 - 2.0 * x)
             layers = ((t, 1.0 - w), (t - self.period, w))
         else:
             layers = ((t, 1.0),)

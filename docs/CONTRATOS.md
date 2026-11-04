@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.6.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.7.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -14,13 +14,13 @@ El orden es fijo: estos índices aparecen en las máscaras, en el ONNX, en la AP
 
 | Índice | Nombre (`name`) | Etiqueta en UI | Color UI (Rayos X) | Efecto en el motor |
 |---|---|---|---|---|
-| 0 | `fondo` | Fondo | `#3A3F4B` | Ninguno propio; solo el parallax global |
+| 0 | `fondo` | Fondo | `#3A3F4B` | Ninguno: queda quieto |
 | 1 | `cielo` | Cielo | `#4FC3F7` | Nubes por desplazamiento de textura; estrellas si es de noche |
 | 2 | `agua` | Agua | `#2979FF` | Ondas y reflejos |
 | 3 | `vegetacion` | Vegetación | `#66BB6A` | Vaivén leve y hojas que caen |
 | 4 | `fuego_luz` | Fuego / luz | `#FF7043` | Parpadeo y brillo |
-| 5 | `persona` | Persona | `#EC407A` | Parallax 2.5D como primer plano |
-| 6 | `animal` | Animal | `#FFCA28` | Parallax 2.5D como primer plano |
+| 5 | `persona` | Persona | `#EC407A` | Queda quieta, por encima de las partículas traseras |
+| 6 | `animal` | Animal | `#FFCA28` | Queda quieto, por encima de las partículas traseras |
 
 - `NUM_CLASSES = 7`.
 - `IGNORE_INDEX = 255`: píxel sin etiqueta. Solo existe en entrenamiento y evaluación; no entra en la pérdida ni en las métricas. **Nunca** aparece en una máscara de inferencia.
@@ -79,7 +79,7 @@ Función compartida (única implementación de la inferencia): `backend/app/serv
 | Salida interna | profundidad inversa relativa, sin unidades |
 | Salida hacia el motor | `depth`: `float32`, forma `(H, W)`, rango `[0, 1]` por min-max, donde **1.0 = más cerca de la cámara** |
 
-Solo se usa para el parallax. Es una medida relativa: no sirve para medir distancias.
+Es una medida relativa: no sirve para medir distancias. **Desde la versión 1.7.0 el motor no la usa**, porque el equipo eligió retirar el parallax. El modelo se conserva por ahora; su retirada se decide al integrar el modelo real.
 
 ### 2.3 Modelo dummy (solo desarrollo)
 
@@ -393,7 +393,7 @@ def get_mood(name: MoodName) -> MoodParams: ...
 def animate_image(
     image_bgr: np.ndarray,
     mask: np.ndarray,
-    depth: Optional[np.ndarray],   # si es None, se omite el parallax
+    depth: Optional[np.ndarray],   # se valida, pero no cambia el resultado
     config: RenderConfig,
     progress: Optional[ProgressFn] = None,
 ) -> Iterator[np.ndarray]:
@@ -430,10 +430,12 @@ Son valores de partida, ajustables por el Agente Motor tras verlos en pantalla. 
 
 | Mood | speed | saturation | warmth | contrast | particle_kind | particle_density | parallax_amplitude | vignette |
 |---|---|---|---|---|---|---|---|---|
-| `calma` | 0.6 | 0.95 | 0.05 | 1.00 | `polen` | 30 | 0.010 | 0.10 |
-| `epico` | 1.4 | 1.15 | -0.10 | 1.20 | `brasas` | 75 | 0.022 | 0.35 |
-| `magico` | 1.0 | 1.25 | -0.05 | 1.05 | `chispas` | 110 | 0.015 | 0.20 |
-| `nostalgico` | 0.8 | 0.70 | 0.35 | 0.95 | `polvo` | 50 | 0.012 | 0.40 |
+| `calma` | 0.6 | 0.95 | 0.05 | 1.00 | `polen` | 30 | 0.0 | 0.10 |
+| `epico` | 1.4 | 1.15 | -0.10 | 1.20 | `brasas` | 75 | 0.0 | 0.35 |
+| `magico` | 1.0 | 1.25 | -0.05 | 1.05 | `chispas` | 110 | 0.0 | 0.20 |
+| `nostalgico` | 0.8 | 0.70 | 0.35 | 0.95 | `polvo` | 50 | 0.0 | 0.40 |
+
+`parallax_amplitude` se conserva en 0 para no romper la firma; el motor lo ignora.
 
 **Comportamientos precisados:**
 
@@ -599,6 +601,7 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.7.0 | 2026-11-04 | Sin parallax: el sujeto y el fondo quedan quietos; `depth` no cambia el resultado | Decisión de Erika tras ver los videos en movimiento (opción A) |
 | 1.6.0 | 2026-11-04 | `/metrics` en Nginx, bandera de k3s, Release de modelos y reemplazo de modelos antiguos en el PVC | Propuestas del Agente DevOps |
 | 1.5.0 | 2026-11-03 | Ruta `/modelo` y botón de galería en el frontend | Propuestas del Agente Frontend. Pendientes para la Fase 2: límites de duración, pincel y `max_pixels` en `/config`, y `queue_position` en jobs |
 | 1.4.0 | 2026-11-03 | BoWFire como fuente de fuego, con su limitación; valores de `source`; definición del hash del manifiesto y de las métricas | Decisión D2 y propuestas del Agente ML |

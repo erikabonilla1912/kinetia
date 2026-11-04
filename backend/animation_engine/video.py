@@ -65,7 +65,7 @@ def animate_video(
     """Llama a segment() cada infer_every_n frames y, entre medias, propaga la
     máscara con flujo óptico Farneback. No acumula todos los frames en memoria.
 
-    Con ``depth``, se usa ese único mapa para todo el video. Los efectos periódicos
+    ``depth`` se valida, pero no se usa: el sujeto y el fondo quedan quietos. Los efectos periódicos
     usan ``config.duration_s`` como ciclo; el video no se cierra en loop.
     """
     if infer_every_n < 1:
@@ -78,7 +78,6 @@ def _generate(frames, segment, infer_every_n, config, depth, progress) -> Iterat
     total = len(frames) if hasattr(frames, "__len__") else None
     timeline = VideoTimeline(config.fps, config.duration_s)
     shape = None
-    clean_depth = None
     assets = grader = brush = particles = None
     prev_gray = None
     mask = None
@@ -86,7 +85,7 @@ def _generate(frames, segment, infer_every_n, config, depth, progress) -> Iterat
         validate_image(frame, "frame")
         if shape is None:
             shape = frame.shape[:2]
-            clean_depth = normalize_depth(depth, shape)
+            normalize_depth(depth, shape)  # se valida por contrato; el motor ya no lo usa
         elif frame.shape[:2] != shape:
             raise ValueError(f"El frame {i} tiene forma {frame.shape[:2]}; se esperaba {shape}")
 
@@ -105,7 +104,7 @@ def _generate(frames, segment, infer_every_n, config, depth, progress) -> Iterat
                 brush = BrushEffect(config.strokes, assets)
                 # Bosque y partículas se fijan con el primer frame, para que no parpadeen.
                 particles = ParticleLayer(frame, mask, assets, forest=is_forest(mask))
-            scene = Scene(frame, mask, clean_depth, assets, particles, grader, brush, fast=True)
+            scene = Scene(frame, mask, assets, particles, grader, brush)
             out = scene.render(timeline.frame(i))
         if progress is not None:
             if total:

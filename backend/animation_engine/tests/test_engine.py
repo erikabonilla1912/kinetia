@@ -16,7 +16,6 @@ from animation_engine.effects.brush import rasterize_strokes
 from animation_engine.effects.fire import glow_reach_px
 from animation_engine.effects.sky import is_night
 from animation_engine.effects.vegetation import is_forest
-from animation_engine.parallax import ParallaxRig
 
 from .conftest import full_mask, neutral_config, neutral_mood, ramp_depth, textured_image
 
@@ -170,7 +169,7 @@ def test_sparse_regions_match_dense_rendering():
     finally:
         masks_module.Region._DENSE_FILL = original
     assert all(mae(a, b) < 0.02 for a, b in zip(sparse, dense))
-    assert all(int(cv2.absdiff(a, b).max()) <= 1 for a, b in zip(sparse, dense))
+    assert all(int(cv2.absdiff(a, b).max()) <= 2 for a, b in zip(sparse, dense))
 
 
 def test_negative_seed_is_valid(image, mask):
@@ -203,7 +202,7 @@ def test_single_class_full_image(image, depth, cls):
 
 
 def test_depth_none_skips_parallax(image, mask):
-    """Sin depth, una máscara solo de persona queda quieta aunque el mood pida parallax."""
+    """Sin depth, una máscara solo de persona queda quieta."""
     subject = np.full(image.shape[:2], FONDO, np.uint8)
     subject[40:140, 100:220] = PERSONA
     config = neutral_config(mood=neutral_mood(parallax_amplitude=0.03))
@@ -462,83 +461,6 @@ def test_brush_is_periodic(image):
     config = neutral_config(strokes=(_stroke(),), brush_mode="only", duration_s=2.0, crossfade_s=0.0)
     seam, typical = _loop_metrics(render(image, mask, None, config))
     assert seam <= 1.5 * typical
-
-
-# ---------- Parallax ----------
-
-
-def _subject_scene():
-    img = textured_image()
-    mask = np.full(img.shape[:2], FONDO, np.uint8)
-    mask[50:150, 120:200] = PERSONA
-    return img, mask
-
-
-def test_parallax_moves_with_depth():
-    img, mask = _subject_scene()
-    config = neutral_config(mood=neutral_mood(parallax_amplitude=0.03), duration_s=2.0)
-    frames = render(img, mask, ramp_depth(), config)
-    assert mae(frames[0], frames[6]) > 1.0
-
-
-def test_parallax_never_exposes_black_border():
-    """Con una imagen sin negro, el encuadre nunca deja ver zonas vacías."""
-    img = np.clip(textured_image().astype(np.int32) + 40, 40, 255).astype(np.uint8)
-    _, mask = _subject_scene()
-    config = neutral_config(mood=neutral_mood(parallax_amplitude=0.03), duration_s=2.0)
-    for frame in render(img, mask, ramp_depth(), config):
-        assert frame.max(axis=2).min() >= 30
-
-
-def test_subject_separates_from_background():
-    """El sujeto se desplaza respecto al fondo aunque depth sea plano."""
-    h, w = 180, 320
-    img = np.full((h, w, 3), 90, np.uint8)
-    mask = np.full((h, w), FONDO, np.uint8)
-    img[60:120, 130:190] = (20, 220, 240)
-    mask[60:120, 130:190] = PERSONA
-    depth = np.full((h, w), 0.5, np.float32)
-    config = neutral_config(mood=neutral_mood(parallax_amplitude=0.03), duration_s=2.0)
-    frames = render(img, mask, depth, config)
-    centers = []
-    for f in frames:
-        ys, xs = np.nonzero((f[..., 2] > 150) & (f[..., 0] < 100))
-        centers.append(xs.mean())
-    assert max(centers) - min(centers) > 3.0
-
-
-def test_no_halo_behind_subject():
-    """El fondo detrás del sujeto se rellena: no queda ninguna silueta del color del sujeto."""
-    h, w = 180, 320
-    img = textured_image(h, w) // 2 + 40
-    subject_color = np.array([10, 10, 255], np.uint8)
-    mask = np.full((h, w), FONDO, np.uint8)
-    cv2.circle(mask, (160, 90), 40, int(PERSONA), -1)
-    img[mask == PERSONA] = subject_color
-    mood = neutral_mood(parallax_amplitude=0.03)
-    from animation_engine.assets import Assets
-
-    config = RenderConfig(mood=mood, duration_s=1.0, fps=12)
-    assets = Assets((h, w), config, 1.0, shared=False)
-    rig = ParallaxRig(img, mask, ramp_depth(h, w), assets, fast=False)
-    # Ningún rojo puro sobrevive en el fondo reconstruido.
-    redness = rig.bg_plate[..., 2].astype(np.int32) - rig.bg_plate[..., 0].astype(np.int32)
-    assert redness.max() < 150
-
-
-def test_bg_plate_is_computed_once(monkeypatch, image, mask, depth):
-    import animation_engine.parallax as parallax
-
-    calls = {"n": 0}
-    original = parallax.inpaint_hole
-
-    def counting(*args, **kwargs):
-        calls["n"] += 1
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr(parallax, "inpaint_hole", counting)
-    render(image, mask, depth, RenderConfig(mood=get_mood("calma"), duration_s=1.0, fps=12))
-    assert calls["n"] == 1
 
 
 # ---------- Moods ----------

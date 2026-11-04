@@ -1,4 +1,4 @@
-"""Agua: ondas con perspectiva, reflejo especular de lo que hay encima y destellos."""
+"""Agua: ondas con perspectiva y reflejo especular de lo que hay encima."""
 from __future__ import annotations
 
 import cv2
@@ -6,12 +6,12 @@ import numpy as np
 
 from ..assets import Assets
 from ..constants import AGUA
-from ..masks import Region, add_tinted, blend, clip_alpha, inner_feather, region_plate, scale_pixels
+from ..masks import Region, blend, clip_alpha, inner_feather, region_plate, scale_pixels
 from ..noise import Wave, WaveBank
 from ..timing import FrameTime, cycles, omega
 
 FEATHER_PX = 8.0
-AMPLITUDE_PX = 3.4
+AMPLITUDE_PX = 1.0
 
 
 def _psi(h: int) -> np.ndarray:
@@ -37,17 +37,6 @@ def _build_bank(assets: Assets, roi) -> WaveBank:
     factor = 2 if max(assets.shape) >= 640 else 1
     warp = assets.phase_warp("water.warp", factor, 120.0, 1.3)
     return WaveBank((h, w), waves, roi=roi, psi=_psi(h), factor=factor, warp=warp)
-
-
-def _glint_color(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    others = mask != AGUA
-    base = np.array([255.0, 255.0, 255.0])
-    if others.any():
-        luma = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        top = image[(luma >= np.percentile(luma, 95)) & others]
-        if len(top):
-            base = top.mean(axis=0)
-    return np.clip(0.5 * base + 0.5 * 255.0, 0, 255).astype(np.float32)
 
 
 class WaterEffect:
@@ -95,12 +84,9 @@ class WaterEffect:
         self.mirror_x = x_local[::2, ::2] * 0.5
         self.mirror_y = mirror_y[::2, ::2] * 0.5
         # Fresnel: el reflejo pesa más hacia el horizonte.
-        self.reflect = self.region.pick(clip_alpha(np.tile(0.03 + 0.20 * (1.0 - rho) ** 1.4, (1, x1 - x0))))
+        self.reflect = self.region.pick(clip_alpha(np.tile(0.02 + 0.10 * (1.0 - rho) ** 1.4, (1, x1 - x0))))
         self.has_above = y0 > 0
 
-        # Color de los destellos, a partir de lo más brillante de la escena.
-        self.glint_color = assets.cached("water.glint", lambda: _glint_color(image, mask))
-        self.glint_scale = self.region.pick(np.tile(0.35 + 0.65 * rho, (1, x1 - x0)))
 
     def apply(self, canvas: np.ndarray, ft: FrameTime) -> None:
         if not self.active:
@@ -129,11 +115,6 @@ class WaterEffect:
             layer = blend(layer, up(mirrored), self.reflect)
 
         # Sombreado por pendiente: da relieve aunque el agua de la foto sea lisa.
-        layer = scale_pixels(layer, 1.0 + 0.11 * slope)
-
-        # Destellos: solo las crestas más orientadas a la luz.
-        glint = np.maximum(slope - 1.02, 0.0)
-        glint = glint * glint * 2.2 * self.glint_scale
-        layer = add_tinted(layer, glint, self.glint_color)
+        layer = scale_pixels(layer, 1.0 + 0.045 * slope)
 
         self.region.composite(canvas, layer)
