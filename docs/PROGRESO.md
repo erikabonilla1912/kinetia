@@ -13,9 +13,9 @@ Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una t
 | T2 | Notebook, evaluación, exportación; entrenamiento lo ejecuta Erika Bonilla en Colab | ML + Erika | en curso (notebook aprobado en CPU; **sin probar en Colab**; falta el entrenamiento real) | 2026-11-03 | 0 | Orquestador: notebook ejecutado en SMOKE_TEST en carpeta limpia (2 min 48 s), 5 archivos válidos. Cifras de humo: no son resultados del modelo |
 | T3 | API, validaciones, inferencia, jobs, modelo dummy | Backend | aprobada (Fase 1; se repite con el modelo real en la Fase 2) | 2026-11-03 | 1 | Orquestador: pytest 220 pasadas, 0 omitidas, con FFmpeg real; flujo real con uvicorn hasta MP4/GIF válidos; `/analyze` 1080p 999 ms **con modelo dummy** |
 | T4 | Efectos, parallax, partículas, moods, video | Motor | aprobada (Fase 1; falta revisión humana de los MP4 en movimiento) | 2026-11-03 | 1 | Orquestador: motor 108 pruebas y backend 220 pasadas; por API real con CPU al 74 % y modelo dummy, 48 frames en 13,1 s de render (antes 29,5 s), es decir, unos 26 s por 96 frames, cifra extrapolada; revisión de hojas de contacto. Máscaras de prueba, no del modelo real |
-| T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | en curso | 2026-11-02 | 0 | |
+| T5 | Interfaz, pincel, comparador, Rayos X, QR, galería | Frontend | aprobada (Fase 1; falta celular real y el modelo real) | 2026-11-03 | 0 | Orquestador: build sin errores, 160 pruebas, `npm audit` 0 vulnerabilidades; capturas revisadas. Del agente, sin repetir: 30/30 contra la API real. Render por API real (lago, 4 s, modelo dummy): 15–17 s sin pincel, 23 s con `add`, 4 s con `only` |
+| T7 | Docker, Kubernetes, CI/CD, monitoreo, `make demo` | DevOps | en curso (adelantado; con modelo de prueba hasta recibir el real) | 2026-11-03 | 0 | |
 | T6 | Pruebas de API, modelo, rendimiento y frontend | QA | pendiente | | 0 | |
-| T7 | Docker, Kubernetes, CI/CD, monitoreo, `make demo` | DevOps | pendiente | | 0 | |
 | T8 | Documento técnico, diagramas, README, guion, preguntas | Documentación | pendiente | | 0 | |
 | T9 | Verificación cruzada e integración final en clúster limpio | Orquestador | pendiente | | 0 | |
 
@@ -52,6 +52,8 @@ La tabla completa, con su mitigación, está en [PLAN.md](PLAN.md#6-riesgos).
 | Límite de uso de la cuenta: cuatro agentes en paralelo lo agotaron en menos de una hora y se perdió cerca de un día | Abierto; se trabaja por tandas | Cada fase |
 | Bordes imprecisos del modelo real: lo mal clasificado como cielo se mueve con las nubes | Abierto; se evalúa con el modelo entrenado | Fase 2 |
 | Render cercano al objetivo de 30 s cuando la máquina está cargada | Abierto; medir con el modelo real y en el pod | Fase 2 |
+| **El portátil entra en espera por inactividad y congela los jobs:** un render de unos 20 s tardó 1618 s por una espera de 21:10 a 21:37 del 3 nov, comprobada en el registro de Windows | Abierto; `make demo` debe impedir la espera mientras corra; también afecta el entrenamiento en Colab | Fase 2 |
+| Texto de consentimiento para menores sin validar | Abierto; lo revisa el equipo | Antes de la Expo |
 
 ## Resúmenes de fase
 

@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.4.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.5.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -573,9 +573,11 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | `/` | Estudio: subir, Rayos X, mood, pincel, comparador y exportar |
 | `/expo/subir` | Versión móvil a la que lleva el QR; incluye la casilla de consentimiento para la galería |
 | `/expo/pantalla` | Muro para la pantalla grande con el QR visible |
+| `/modelo` | Métricas del modelo, tal como las devuelve `GET /api/v1/model/metrics` |
 
 - Los colores, las clases y los límites se leen de `GET /api/v1/config`; no se duplican en el código.
 - La cámara se abre con `<input type="file" accept="image/*,video/*" capture>`. No se usa `getUserMedia`, porque exige HTTPS y el QR va por HTTP en la red local.
+- `/expo/subir` tiene además un botón "Elegir de mi galería", con un segundo input sin `capture`, porque `capture` obliga a usar la cámara en móvil.
 
 ---
 
@@ -593,6 +595,7 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.5.0 | 2026-11-03 | Ruta `/modelo` y botón de galería en el frontend | Propuestas del Agente Frontend. Pendientes para la Fase 2: límites de duración, pincel y `max_pixels` en `/config`, y `queue_position` en jobs |
 | 1.4.0 | 2026-11-03 | BoWFire como fuente de fuego, con su limitación; valores de `source`; definición del hash del manifiesto y de las métricas | Decisión D2 y propuestas del Agente ML |
 | 1.3.0 | 2026-11-03 | Densidades finales de partículas y comportamientos precisados del motor | Propuestas del Agente Motor, aceptadas |
 | 1.2.0 | 2026-11-02 | `label` en `/config`; `seed` en jobs; códigos de error añadidos; `stage: done`; `null` en tiempos sin medir; fechas con milisegundos; marca del `metrics.json` dummy | Propuestas del Agente Backend, aceptadas |
