@@ -1,4 +1,8 @@
-"""Entrenamiento de la segmentacion de KINETIA, reanudable por epoca.
+"""Entrenamiento de la segmentacion de KINETIA, reanudable por epoca, DESDE CERO.
+
+Sin transfer learning: todos los pesos arrancan aleatorios (ml/model.py) y el checkpoint
+lleva la marca `init`. Un checkpoint sin esa marca, como el del modelo anterior con pesos
+de ImageNet, no se puede reanudar.
 
 Reanudacion: en cada epoca se guardan modelo, optimizador, scheduler, scaler, estado de RNG,
 mejor mIoU, contador de early stopping e historial. Al arrancar, si existe `last.ckpt` se
@@ -12,13 +16,18 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import random
 import shutil
 import time
 from pathlib import Path
 from typing import Optional
 
-import albumentations as A
+# Albumentations consulta pypi.org al importarse para avisar de versiones nuevas. El
+# entrenamiento no necesita red: se desactiva, y una prueba comprueba que no hay conexiones.
+os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
+
+import albumentations as A  # noqa: E402
 import cv2
 import numpy as np
 import segmentation_models_pytorch as smp
@@ -41,7 +50,7 @@ from dataset import (
     read_manifest,
     rows_for_split,
 )
-from model import ENCODER_NAME, build_model
+from model import ENCODER_NAME, INIT, build_model
 from prepare_data import compute_class_weights
 from seg_metrics import metrics_from_confusion
 
@@ -140,17 +149,13 @@ def save_checkpoint(ckpt: dict, out_dir: Path) -> None:
     save_torch_atomic(ckpt, last)
 
 
-def set_encoder_trainable(model: torch.nn.Module, trainable: bool) -> None:
-    for param in model.encoder.parameters():
-        param.requires_grad = trainable
+class InitMismatchError(RuntimeError):
+    """El checkpoint no viene de un entrenamiento desde cero."""
 
 
-def build_optimizer(model: torch.nn.Module, lr: float, encoder_lr: float, weight_decay: float) -> torch.optim.Optimizer:
-    groups = [
-        {"params": list(model.encoder.parameters()), "lr": encoder_lr},
-        {"params": list(model.decoder.parameters()) + list(model.segmentation_head.parameters()), "lr": lr},
-    ]
-    return torch.optim.AdamW(groups, weight_decay=weight_decay)
+def build_optimizer(model: torch.nn.Module, lr: float, weight_decay: float) -> torch.optim.Optimizer:
+    """Una sola tasa para todo el modelo: no hay pesos previos que proteger."""
+    return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
 
 class CombinedLoss(torch.nn.Module):
@@ -189,11 +194,9 @@ def make_loaders(args, train_rows: list[dict], val_rows: list[dict]) -> tuple[Da
     return train_loader, val_loader
 
 
-def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None, use_amp=False, freeze_encoder=False) -> dict:
+def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None, use_amp=False) -> dict:
     is_train = optimizer is not None
     model.train(is_train)
-    if is_train and freeze_encoder:
-        model.encoder.eval()  # no actualizar BatchNorm mientras el encoder esta congelado
     total_loss, total_batches = 0.0, 0
     matrix = torch.zeros((NUM_CLASSES, NUM_CLASSES), dtype=torch.int64, device=device)
     amp_device = "cuda" if device.type == "cuda" else "cpu"
@@ -225,6 +228,7 @@ def write_best_model(model, out_dir: Path, epoch: int, miou: float, manifest_has
     payload = {
         "state_dict": state,
         "encoder_name": ENCODER_NAME,
+        "init": INIT,
         "classes": CLASSES,
         "input_size": [320, 320],
         "epoch": epoch,
@@ -239,20 +243,17 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--data-root", type=Path, default=Path("data/processed"))
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--out-dir", type=Path, default=Path("data/runs/default"), help="En Colab, una carpeta de Drive")
-    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--encoder-lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--freeze-encoder-epochs", type=int, default=2)
-    parser.add_argument("--patience", type=int, default=8)
+    parser.add_argument("--patience", type=int, default=15)
     parser.add_argument("--min-delta", type=float, default=0.001)
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--limit-train", type=int, default=None)
     parser.add_argument("--limit-val", type=int, default=None)
-    parser.add_argument("--no-pretrained", action="store_true", help="Solo para pruebas")
     parser.add_argument("--stop-after-epochs", type=int, default=None, help="Solo para pruebas: para limpiamente tras guardar esa epoca")
     return parser.parse_args(argv)
 
@@ -271,8 +272,8 @@ def train(args: argparse.Namespace) -> dict:
     print(f"Particiones: train={len(train_rows)} val={len(val_rows)}. La de prueba no se abre aqui.", flush=True)
 
     seed_everything(args.seed)
-    model = build_model(pretrained=not args.no_pretrained).to(device)
-    optimizer = build_optimizer(model, args.lr, args.encoder_lr, args.weight_decay)
+    model = build_model().to(device)
+    optimizer = build_optimizer(model, args.lr, args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1), eta_min=1e-6)
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
@@ -288,6 +289,11 @@ def train(args: argparse.Namespace) -> dict:
     state = {"epoch": 0, "best_miou": -1.0, "best_epoch": 0, "bad_epochs": 0, "history": [], "finished": False}
     ckpt = load_checkpoint(args.out_dir)
     if ckpt is not None:
+        if ckpt.get("init") != INIT:
+            raise InitMismatchError(
+                f"El checkpoint de {args.out_dir} no viene de un entrenamiento desde cero (es el modelo anterior, "
+                "con pesos de ImageNet). Usa otra carpeta: este no se puede reanudar."
+            )
         if ckpt["dataset_manifest_sha256"] != manifest_hash:
             raise ManifestMismatchError("El checkpoint se entreno con otro manifiesto; no se puede reanudar con este.")
         model.load_state_dict(ckpt["model"])
@@ -311,11 +317,9 @@ def train(args: argparse.Namespace) -> dict:
     while state["epoch"] < args.epochs:
         epoch = state["epoch"] + 1
         start = time.time()
-        freeze = epoch <= args.freeze_encoder_epochs
-        set_encoder_trainable(model, not freeze)
         # Albumentations tiene su propio RNG: se siembra desde el principal, que se restaura al reanudar.
         train_loader.dataset.transform.set_random_seed(int(torch.randint(0, 2**31 - 1, (1,)).item()))
-        train_m = run_epoch(model, train_loader, criterion, device, optimizer, scaler, use_amp, freeze)
+        train_m = run_epoch(model, train_loader, criterion, device, optimizer, scaler, use_amp)
         train_seconds = time.time() - start
         val_m = run_epoch(model, val_loader, criterion, device)
         scheduler.step()
@@ -337,8 +341,7 @@ def train(args: argparse.Namespace) -> dict:
                 "val_miou": val_m["miou"],
                 "val_pixel_accuracy": val_m["pixel_accuracy"],
                 "val_iou_per_class": {k: v["iou"] for k, v in val_m["per_class"].items()},
-                "lr_encoder": optimizer.param_groups[0]["lr"],
-                "lr_decoder": optimizer.param_groups[1]["lr"],
+                "lr": optimizer.param_groups[0]["lr"],
                 "seconds": seconds,
                 "train_seconds": train_seconds,
             }
@@ -351,6 +354,7 @@ def train(args: argparse.Namespace) -> dict:
 
         ckpt = {
             **copy.deepcopy(state),
+            "init": INIT,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),

@@ -136,7 +136,6 @@
                   <div class="flex gap-1.5"><dt>Semilla</dt><dd class="text-paper" data-testid="result-seed">{{ job().job?.seed }}</dd></div>
                   @if (job().job?.timings_ms; as timings) {
                     <div class="flex gap-1.5"><dt>Segmentación</dt><dd class="text-paper" data-testid="timing-segmentation">{{ ms(timings.segmentation) }}</dd></div>
-                    <div class="flex gap-1.5"><dt>Profundidad</dt><dd class="text-paper" data-testid="timing-depth">{{ ms(timings.depth) }}</dd></div>
                     <div class="flex gap-1.5"><dt>Render</dt><dd class="text-paper" data-testid="timing-render">{{ ms(timings.render) }}</dd></div>
                     <div class="flex gap-1.5"><dt>Codificación</dt><dd class="text-paper" data-testid="timing-encode">{{ ms(timings.encode) }}</dd></div>
                     <div class="flex gap-1.5"><dt>Total</dt><dd class="text-paper" data-testid="timing-total">{{ ms(timings.total) }}</dd></div>

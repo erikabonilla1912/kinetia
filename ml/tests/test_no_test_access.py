@@ -14,14 +14,20 @@ from dataset import TRAINING_SPLITS, ForbiddenSplitError, SegDataset, read_manif
 ML_DIR = Path(__file__).resolve().parents[1]
 
 # Registra con un evento de auditoria cada archivo abierto mientras train.py entrena de verdad.
+# Tambien registra cualquier intento de conexion de red: entrenar desde cero no descarga pesos.
 AUDIT_RUNNER = r"""
 import json, sys
-opened = []
-sys.addaudithook(lambda e, a: opened.append(str(a[0])) if e == "open" and a and isinstance(a[0], (str, bytes)) else None)
+opened, network = [], []
+def hook(event, args):
+    if event == "open" and args and isinstance(args[0], (str, bytes)):
+        opened.append(str(args[0]))
+    elif event in ("socket.connect", "socket.getaddrinfo", "urllib.Request"):
+        network.append(event + " " + repr(args[:2]))
+sys.addaudithook(hook)
 sys.path.insert(0, sys.argv[1])
 import train
 train.train(train.parse_args(sys.argv[3:]))
-json.dump(sorted(set(p for p in opened if isinstance(p, str))), open(sys.argv[2], "w"))
+json.dump({"opened": sorted(set(p for p in opened if isinstance(p, str))), "network": network}, open(sys.argv[2], "w"))
 """
 
 
@@ -31,11 +37,13 @@ def test_training_really_runs_without_opening_test_files(mini_dataset, tmp_path)
     cmd = [
         sys.executable, "-c", AUDIT_RUNNER, str(ML_DIR), str(log),
         "--data-root", str(data), "--manifest", str(manifest), "--out-dir", str(tmp_path / "run"),
-        "--epochs", "1", "--batch-size", "2", "--num-workers", "0", "--no-pretrained", "--device", "cpu",
+        "--epochs", "1", "--batch-size", "2", "--num-workers", "0", "--device", "cpu",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr[-3000:]
-    opened = json.loads(log.read_text())
+    audit = json.loads(log.read_text())
+    assert audit["network"] == [], f"El entrenamiento intento conectarse a la red: {audit['network'][:3]}"
+    opened = audit["opened"]
     png = [Path(p).name for p in opened if str(data) in p and p.endswith(".png")]
     train_ids = {r["image_id"] for r in rows if r["split"] == "train"}
     val_ids = {r["image_id"] for r in rows if r["split"] == "val"}

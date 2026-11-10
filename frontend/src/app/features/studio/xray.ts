@@ -216,10 +216,6 @@ export class XrayOverlay implements OnDestroy {
         </dd>
       </div>
       <div class="col-span-2 rounded-xl bg-white/5 p-3">
-        <dt class="text-xs text-mist">Profundidad</dt>
-        <dd class="data mt-0.5" data-testid="inference-depth">{{ ms(data.inference_ms.depth) }}</dd>
-      </div>
-      <div class="col-span-2 rounded-xl bg-white/5 p-3">
         <dt class="text-xs text-mist">Modelo</dt>
         <dd class="data mt-0.5 break-all" data-testid="model-version">{{ data.model_version }}</dd>
         <dd class="data mt-0.5 text-xs text-mist" [title]="data.model_sha256">

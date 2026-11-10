@@ -100,8 +100,7 @@ ERRORS_TOTAL = Counter("kinetia_errors_total", "Errores por código estable.", [
 QUEUE_DEPTH = Gauge("kinetia_queue_depth", "Jobs en cola.", registry=REGISTRY)
 
 # Crea las series conocidas para que existan en /metrics desde el arranque, en cero.
-for _model in ("seg", "depth"):
-    INFERENCE_SECONDS.labels(model=_model)
+INFERENCE_SECONDS.labels(model="seg")
 for _media in ("image", "video"):
     JOB_DURATION_SECONDS.labels(media=_media)
 for _status in ("succeeded", "failed"):

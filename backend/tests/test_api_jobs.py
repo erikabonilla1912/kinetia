@@ -65,14 +65,15 @@ def test_job_cycle_field_by_field(client, engine, fake_encoder, settings):
 
     timings = body["timings_ms"]
     assert set(timings) == {"segmentation", "depth", "render", "encode", "total"}
-    assert all(isinstance(value, (int, float)) and value >= 0 for value in timings.values())
-    assert timings["total"] >= timings["segmentation"] + timings["depth"]
+    assert timings["depth"] is None  # contrato v1.8: sin modelo de profundidad
+    measured = {k: v for k, v in timings.items() if k != "depth"}
+    assert all(isinstance(value, (int, float)) and value >= 0 for value in measured.values())
+    assert timings["total"] >= timings["segmentation"]
 
     call = engine.image_calls[0]
     assert call["image"].shape == (480, 640, 3)
     assert call["mask"].shape == (480, 640) and call["mask"].dtype.name == "uint8"
-    assert call["depth"].shape == (480, 640) and call["depth"].dtype.name == "float32"
-    assert 0.0 <= call["depth"].min() <= call["depth"].max() <= 1.0
+    assert call["depth"] is None
     assert call["config"].seed == 7
     assert call["config"].mood.name == "epico"
     assert call["config"].duration_s == 2.0
@@ -424,4 +425,6 @@ def test_real_engine_through_the_job_pipeline(settings, fake_encoder):
         body = wait_job(client, job_id, 240)
     assert body["status"] == "succeeded", body
     assert body["result"]["duration_s"] == 2.0
-    assert all(value > 0 for value in body["timings_ms"].values())
+    timings = body["timings_ms"]
+    assert timings["depth"] is None  # contrato v1.8: sin modelo de profundidad
+    assert all(value > 0 for key, value in timings.items() if key != "depth")

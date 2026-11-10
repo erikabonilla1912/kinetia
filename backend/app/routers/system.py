@@ -34,10 +34,10 @@ def health(services: AppServices = Depends(get_services)) -> JSONResponse:
         {
             "status": "ok",
             "model_loaded": True,
-            "depth_loaded": True,
+            "depth_loaded": False,  # sin modelo de profundidad desde el contrato v1.8
             "model_version": models.version,
             "model_sha256": models.seg_sha256,
-            "depth_sha256": models.depth_sha256,
+            "depth_sha256": None,
         }
     )
 

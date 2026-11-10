@@ -9,8 +9,12 @@ import cv2
 import numpy as np
 
 SEG_INPUT_SIZE = 320
-IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
-IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
+# Media y desviación de NUESTRAS imágenes de entrenamiento (ml/compute_norm_stats.py), no de
+# ImageNet: el modelo se entrena desde cero. Deben ser las de ml/dataset.py y las de manifest.json.
+NORM_MEAN_RGB = (0.4657, 0.4461, 0.4079)
+NORM_STD_RGB = (0.2706, 0.2678, 0.2831)
+_MEAN = np.array(NORM_MEAN_RGB, dtype=np.float32).reshape(3, 1, 1)
+_STD = np.array(NORM_STD_RGB, dtype=np.float32).reshape(3, 1, 1)
 
 
 def preprocess_seg(image_bgr: np.ndarray) -> np.ndarray:
@@ -20,7 +24,7 @@ def preprocess_seg(image_bgr: np.ndarray) -> np.ndarray:
     resized = cv2.resize(image_bgr, (SEG_INPUT_SIZE, SEG_INPUT_SIZE), interpolation=cv2.INTER_LINEAR)
     rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
     chw = np.transpose(rgb, (2, 0, 1)).astype(np.float32) / 255.0
-    normalized = (chw - IMAGENET_MEAN) / IMAGENET_STD
+    normalized = (chw - _MEAN) / _STD
     return normalized[np.newaxis, ...].astype(np.float32)
 
 

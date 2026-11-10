@@ -51,7 +51,7 @@ export const STAGE_LABELS: Readonly<Record<JobStage, string>> = {
 export const STAGE_STEPS: readonly { stage: JobStage; label: string }[] = [
   { stage: 'queued', label: 'Cola' },
   { stage: 'segmenting', label: 'Lectura' },
-  { stage: 'depth', label: 'Profundidad' },
+  // Sin etapa de profundidad: desde el contrato v1.8 no hay modelo de profundidad.
   { stage: 'rendering', label: 'Animación' },
   { stage: 'encoding', label: 'Codificación' },
 ];

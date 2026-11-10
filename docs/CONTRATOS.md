@@ -1,6 +1,6 @@
 # KINETIA — Contrato de interfaces
 
-**Versión:** 1.7.0 · **Fecha:** 2026-11-02 · **Dueño:** agente orquestador
+**Versión:** 1.8.0 · **Fecha:** 2026-11-09 · **Dueño:** agente orquestador
 
 Este archivo es la fuente de verdad entre las áreas. Todos los subagentes lo respetan.
 
@@ -52,11 +52,12 @@ Se implementa en `ml/class_mapping.yaml`, por **nombre** de categoría y nunca p
 
 | Propiedad | Valor |
 |---|---|
-| Arquitectura | U-Net con encoder MobileNetV3 Large preentrenado en ImageNet (`segmentation_models_pytorch`) |
+| Arquitectura | U-Net con encoder MobileNetV3 Large (`segmentation_models_pytorch`), **entrenada desde cero**: todos los pesos arrancan aleatorios, sin *transfer learning* |
+| Marca | `init = "desde_cero"` en el checkpoint, en `kinetia_seg.pt` y en `manifest.json`. `train.py` no reanuda, `export.py` no exporta y la API no carga lo que no la tenga |
 | Tensor de entrada | nombre `input`, `float32`, forma `[N, 3, 320, 320]` (NCHW), `N` dinámico |
 | Color | RGB (OpenCV entrega BGR: hay que convertir) |
 | Resize | `cv2.INTER_LINEAR` directo a 320×320, **sin letterbox**, igual en entrenamiento e inferencia |
-| Normalización | Valores `/255`, luego `(x - mean) / std`, con `mean=[0.485, 0.456, 0.406]` y `std=[0.229, 0.224, 0.225]` |
+| Normalización | Valores `/255`, luego `(x - mean) / std`, con `mean=[0.4657, 0.4461, 0.4079]` y `std=[0.2706, 0.2678, 0.2831]`: media y desviación por canal de las 10 583 imágenes de `train`, a 320×320 (`ml/compute_norm_stats.py`, 2026-11-09). No son los valores de ImageNet. El notebook los recalcula y se detiene si no coinciden |
 | Tensor de salida | nombre `logits`, `float32`, forma `[N, 7, 320, 320]`. **Sin softmax**: se aplica en la API |
 | Opset ONNX | ≥ 17 |
 
@@ -70,20 +71,13 @@ Función compartida (única implementación de la inferencia): `backend/app/serv
 
 **Definición de confianza por clase:** promedio de `max_prob` sobre los píxeles asignados a esa clase. No es la probabilidad de que la clase esté en la imagen, y la UI no debe presentarla así.
 
-### 2.2 Profundidad (`midas_small.onnx`) — preentrenado, no entrenado por nosotros
+### 2.2 Profundidad: retirada en la versión 1.8.0
 
-| Propiedad | Valor |
-|---|---|
-| Modelo | MiDaS v2.1 small |
-| Entrada | según el modelo oficial: RGB, `[1, 3, 256, 256]` |
-| Salida interna | profundidad inversa relativa, sin unidades |
-| Salida hacia el motor | `depth`: `float32`, forma `(H, W)`, rango `[0, 1]` por min-max, donde **1.0 = más cerca de la cámara** |
-
-Es una medida relativa: no sirve para medir distancias. **Desde la versión 1.7.0 el motor no la usa**, porque el equipo eligió retirar el parallax. El modelo se conserva por ahora; su retirada se decide al integrar el modelo real.
+El proyecto ya no usa ningún modelo preentrenado. MiDaS v2.1 small se retiró: el motor no lo usaba desde la versión 1.7.0 (sin parallax) y el profesor no permite modelos con *transfer learning*. Por compatibilidad, la API mantiene los campos `depth` con valor `null`: `inference_ms.depth`, `depth_png_base64`, `timings_ms.depth`, `depth_loaded: false` y `depth_sha256: null`. `include_depth` se acepta y se ignora, y la etapa `depth` de los jobs ya no se emite.
 
 ### 2.3 Modelo dummy (solo desarrollo)
 
-- `ml/make_dummy_model.py` genera en `models/dev/` (fuera de git) un `kinetia_seg.onnx` y un `midas_small.onnx` con las firmas de esta sección, pesos aleatorios y `version = "dummy-dev"` en su `manifest.json`. Solo necesita `onnx` y `numpy`, no PyTorch. En desarrollo: `MODELS_DIR=models/dev`.
+- `ml/make_dummy_model.py` genera en `models/dev/` (fuera de git) un `kinetia_seg.onnx` con la firma de esta sección, pesos aleatorios, `version = "dummy-dev"` e `init = "desde_cero"` en su `manifest.json`. Solo necesita `onnx` y `numpy`, no PyTorch. En desarrollo: `MODELS_DIR=models/dev`.
 - La API **se niega a arrancar** con él salvo que `ALLOW_DUMMY_MODEL=true`. Ese valor está prohibido en `k8s/` y en `docker-compose.yml`, y QA lo verifica.
 - Con el dummy, `/api/v1/analyze` devuelve `model_version: "dummy-dev"` y la UI muestra un aviso visible.
 - Su `metrics.json` lleva además `dummy: true` y `split: "dummy"`. Si la UI ve esos campos, muestra que no son resultados del modelo.
@@ -95,7 +89,6 @@ Es una medida relativa: no sirve para medir distancias. **Desde la versión 1.7.
 | Ruta (dentro del pod) | Genera | Se usa en producción | Contenido |
 |---|---|---|---|
 | `/models/kinetia_seg.onnx` | `ml/export.py` | Sí | Segmentación |
-| `/models/midas_small.onnx` | `ml/fetch_depth_model.py` | Sí | Profundidad |
 | `/models/manifest.json` | `ml/export.py` | Sí | Versión y metadatos |
 | `/models/metrics.json` | `ml/evaluate.py` | Sí | Métricas del conjunto de prueba |
 | `models/kinetia_seg.pt` (repo) | `ml/train.py` | **No** | Mejor checkpoint; la imagen `api` no incluye PyTorch |
@@ -113,15 +106,15 @@ Los binarios no se versionan en git. Se publican como asset de un GitHub Release
 
 ```json
 {
-  "version": "seg-1.0.0",
+  "version": "seg-2.0.0",
   "created_at": "2026-11-10T12:00:00Z",
+  "init": "desde_cero",
   "classes": ["fondo", "cielo", "agua", "vegetacion", "fuego_luz", "persona", "animal"],
   "input_size": [320, 320],
-  "mean": [0.485, 0.456, 0.406],
-  "std": [0.229, 0.224, 0.225],
+  "mean": [0.4657, 0.4461, 0.4079],
+  "std": [0.2706, 0.2678, 0.2831],
   "files": {
-    "kinetia_seg.onnx": { "sha256": "<64 hex>", "bytes": 0 },
-    "midas_small.onnx": { "sha256": "<64 hex>", "bytes": 0 }
+    "kinetia_seg.onnx": { "sha256": "<64 hex>", "bytes": 0 }
   },
   "dataset_manifest_sha256": "<64 hex>"
 }
@@ -456,7 +449,6 @@ Son valores de partida, ajustables por el Agente Motor tras verlos en pantalla. 
 |---|---|---|
 | `MODELS_DIR` | `/models` | Carpeta de modelos |
 | `SEG_MODEL_FILE` | `kinetia_seg.onnx` | Modelo de segmentación |
-| `DEPTH_MODEL_FILE` | `midas_small.onnx` | Modelo de profundidad |
 | `RESULTS_DIR` | `/data/results` | Resultados |
 | `DB_PATH` | `/data/db/kinetia.db` | SQLite (modo WAL) |
 | `TMP_DIR` | `/shared-tmp/api` | Temporales |
@@ -478,7 +470,7 @@ Son valores de partida, ajustables por el Agente Motor tras verlos en pantalla. 
 | `LOG_LEVEL` | `INFO` | Nivel de log |
 | `ADMIN_TOKEN` | sin valor | Moderación de galería. Secreto |
 
-**InitContainer `model-loader`:** `MODELS_DIR=/models`, `EXPECTED_SHA256_SEG` y `EXPECTED_SHA256_DEPTH` (ConfigMap `kinetia-model-hashes`).
+**InitContainer `model-loader`:** `MODELS_DIR=/models` y `EXPECTED_SHA256_SEG` (ConfigMap `kinetia-model-hashes`). Borra `midas_small.onnx` si un volumen antiguo lo conserva.
 
 **Build del frontend:** sin variables; llama a la ruta relativa `/api/v1` y lee el resto en `GET /api/v1/config`.
 
@@ -601,6 +593,7 @@ No se despliega un servidor Prometheus, porque sería otro pod y rompería la re
 | Versión | Fecha | Cambio | Motivo |
 |---|---|---|---|
 | 1.0.0-borrador | 2026-11-02 | Versión inicial | Fase 0 |
+| 1.8.0 | 2026-11-09 | Segmentación entrenada desde cero, sin *transfer learning* (marca `init`); normalización con la media y desviación de nuestro `train`; MiDaS retirado y campos `depth` en `null` | El profesor no permite modelos con *transfer learning* |
 | 1.7.0 | 2026-11-04 | Sin parallax: el sujeto y el fondo quedan quietos; `depth` no cambia el resultado | Decisión de Erika tras ver los videos en movimiento (opción A) |
 | 1.6.0 | 2026-11-04 | `/metrics` en Nginx, bandera de k3s, Release de modelos y reemplazo de modelos antiguos en el PVC | Propuestas del Agente DevOps |
 | 1.5.0 | 2026-11-03 | Ruta `/modelo` y botón de galería en el frontend | Propuestas del Agente Frontend. Pendientes para la Fase 2: límites de duración, pincel y `max_pixels` en `/config`, y `queue_position` en jobs |

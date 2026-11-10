@@ -190,7 +190,7 @@ def test_video_job_cycle(settings):
         call = engine.video_calls[0]
         assert call["frames"] == 48
         assert call["segments"] == 10  # VIDEO_INFER_EVERY_N = 5
-        assert call["depth"].shape == (256, 320)
+        assert call["depth"] is None  # contrato v1.8: sin modelo de profundidad
         result = body["result"]
         assert result["fps"] == 24 and result["duration_s"] == 2.0
         assert body["timings_ms"]["segmentation"] > 0

@@ -74,10 +74,10 @@ def test_analyze_include_depth(client):
     response = post_file(client, "/analyze", image_bytes(), include_depth="true")
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["inference_ms"]["depth"] > 0
-    depth = decode_png(body["depth_png_base64"])
-    assert depth.dtype == np.uint8 and depth.shape == (480, 640)
-    assert depth.max() == 255 and depth.min() == 0
+    # Contrato v1.8: ya no hay modelo de profundidad; include_depth se acepta y se ignora.
+    assert body["inference_ms"]["depth"] is None
+    assert body["depth_png_base64"] is None
+    assert decode_png(body["mask_png_base64"]).shape == (480, 640)
 
 
 def test_work_size_reduces_but_never_upscales(client, settings):

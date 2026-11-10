@@ -152,16 +152,15 @@ def test_prometheus_exposes_exact_metrics(client):
         "kinetia_errors_total": "counter",
         "kinetia_queue_depth": "gauge",
     }
-    for label in ('model="seg"', 'model="depth"', 'media="image"', 'media="video"', 'status="succeeded"', 'status="failed"'):
+    assert 'model="depth"' not in text  # contrato v1.8: sin modelo de profundidad
+    for label in ('model="seg"', 'media="image"', 'media="video"', 'status="succeeded"', 'status="failed"'):
         assert label in text
 
 
 def test_metrics_count_real_activity(client, fake_encoder):
     seg_before = sample("kinetia_inference_seconds_count", model="seg")
-    depth_before = sample("kinetia_inference_seconds_count", model="depth")
     assert post_file(client, "/analyze", image_bytes(), include_depth="true").status_code == 200
     assert sample("kinetia_inference_seconds_count", model="seg") == seg_before + 1
-    assert sample("kinetia_inference_seconds_count", model="depth") == depth_before + 1
 
     errors_before = sample("kinetia_errors_total", code="UNSUPPORTED_FORMAT")
     post_file(client, "/analyze", b"texto")
@@ -371,7 +370,8 @@ def test_preprocess_matches_contract_formula():
     assert tensor.shape == (1, 3, 320, 320)
     resized = cv2.resize(image, (320, 320), interpolation=cv2.INTER_LINEAR)
     rgb = resized[..., ::-1].astype(np.float64) / 255.0
-    expected = (rgb - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+    # Media y desviación de nuestro train (contrato v1.8), no las de ImageNet.
+    expected = (rgb - np.array([0.4657, 0.4461, 0.4079])) / np.array([0.2706, 0.2678, 0.2831])
     assert np.abs(tensor[0].transpose(1, 2, 0) - expected).max() < 1e-5
 
 
@@ -379,7 +379,8 @@ def test_preprocess_converts_bgr_to_rgb():
     image = np.zeros((10, 10, 3), dtype=np.uint8)
     image[..., 2] = 255  # rojo en BGR
     tensor = preprocess_seg(image)
-    assert tensor[0, 0, 0, 0] > 2.0 and tensor[0, 2, 0, 0] < -1.5
+    assert tensor[0, 0, 0, 0] == pytest.approx((1.0 - 0.4657) / 0.2706, abs=1e-5)
+    assert tensor[0, 2, 0, 0] == pytest.approx((0.0 - 0.4079) / 0.2831, abs=1e-5)
 
 
 def test_preprocess_rejects_wrong_input():

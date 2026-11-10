@@ -33,7 +33,7 @@ EMBEDDED = [
     "train.py",
     "export.py",
     "evaluate.py",
-    "fetch_depth_model.py",
+    "compute_norm_stats.py",
     "fetch_test_set.py",
     "validate_artifacts.py",
 ]
@@ -97,7 +97,7 @@ def manifest_cell() -> dict:
 INTRO = """
 # KINETIA: entrenamiento del modelo de segmentación
 
-U-Net con encoder MobileNetV3 Large preentrenado en ImageNet, 7 clases, entrada 320×320.
+U-Net con encoder MobileNetV3 Large **entrenada desde cero**: todos los pesos arrancan aleatorios, sin *transfer learning* ni nada de ImageNet. 7 clases, entrada 320×320.
 
 **Cómo usarlo:** activa la GPU T4 (*Entorno de ejecución → Cambiar tipo de entorno*) y pulsa *Entorno de ejecución → Ejecutar todo*. Si la sesión se corta, vuelve a pulsar *Ejecutar todo*: continúa sola desde la última época guardada en Drive. La guía completa está en `docs/COLAB_PASO_A_PASO.md`.
 
@@ -121,10 +121,10 @@ if not SMOKE_TEST and not IN_COLAB:
     raise RuntimeError("Este notebook se entrena en Google Colab. Para una prueba local usa la variable de entorno SMOKE_TEST=1.")
 
 # --- Parámetros del entrenamiento. Ajustados para la T4 gratis: AMP, 2 trabajadores.
-EPOCHS = 2 if SMOKE_TEST else 40           # máximo; el early stopping suele parar antes
+EPOCHS = 2 if SMOKE_TEST else 100          # máximo; desde cero hacen falta más épocas
 BATCH_SIZE = 4 if SMOKE_TEST else 32
 NUM_WORKERS = 0 if SMOKE_TEST else 2       # Colab gratis tiene 2 vCPU
-PATIENCE = 8                               # épocas sin mejorar el mIoU de validación
+PATIENCE = 15                              # épocas sin mejorar el mIoU de validación
 SMOKE_LIMITS = {"train": 16, "val": 6, "test": 6}  # solo se usan en SMOKE_TEST
 
 if SMOKE_TEST:
@@ -141,7 +141,7 @@ RAW_DIR = Path(os.environ.get("KINETIA_RAW_DIR", WORK / "raw")).resolve()
 DATA_DIR = WORK / "data" / "processed"
 OUT_DIR = WORK / "output"                 # los 5 archivos finales
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-MODEL_VERSION = "smoke-test-no-oficial" if SMOKE_TEST else "seg-1.0.0"
+MODEL_VERSION = "smoke-test-no-oficial" if SMOKE_TEST else "seg-2.0.0"
 
 print(f"Modo: {'SMOKE_TEST (prueba del flujo; sus cifras no son resultados)' if SMOKE_TEST else 'REAL'}")
 print(f"Carpeta de trabajo: {WORK}")
@@ -239,13 +239,15 @@ else:
     from google.colab import drive
     drive.mount("/content/drive")
     DRIVE_DIR = Path("/content/drive/MyDrive/kinetia")
-RUN_DIR = DRIVE_DIR / "run"
+# Carpeta nueva: la antigua "run" tiene el modelo con transfer learning y no se puede reanudar.
+RUN_DIR = DRIVE_DIR / "run_desde_cero"
 TAR_PATH = DRIVE_DIR / "dataset" / "kinetia_dataset_320.tar"
 TAR_META = TAR_PATH.with_suffix(".json")
 RUN_DIR.mkdir(parents=True, exist_ok=True)
 TAR_PATH.parent.mkdir(parents=True, exist_ok=True)
 usage = shutil.disk_usage(DRIVE_DIR)
 print(f"Carpeta persistente: {DRIVE_DIR} | libre: {usage.free / 1e9:.1f} GB de {usage.total / 1e9:.1f} GB")
+print(f"Checkpoints de este entrenamiento: {RUN_DIR}")
 """
 
 DATA_MD = """
@@ -350,12 +352,26 @@ for col, r in enumerate(samples):
     axes[1, col].imshow(shown)
     axes[0, col].axis("off"); axes[1, col].axis("off")
 plt.suptitle("Muestras de train: en blanco lo ignorado (255)"); plt.tight_layout(); plt.show()
+
+# La normalización sale de NUESTRAS imágenes de train, no de ImageNet. Se recalcula aquí y
+# se comprueba contra la que usan el modelo y la API (MEAN y STD de ml/dataset.py).
+from compute_norm_stats import channel_stats
+from dataset import MEAN, STD
+stats = channel_stats(DATA_DIR, train_rows)
+print(f"\\nNormalización medida en {stats['num_images']} imágenes de train: media {stats['mean']} | desviación {stats['std']}")
+print(f"Normalización del modelo (ml/dataset.py):          media {[round(float(v), 4) for v in MEAN]} | desviación {[round(float(v), 4) for v in STD]}")
+if SMOKE_TEST:
+    print("SMOKE_TEST: con pocas imágenes no se compara; en la corrida real deben coincidir.")
+elif not (np.allclose(stats["mean"], MEAN, atol=1e-3) and np.allclose(stats["std"], STD, atol=1e-3)):
+    raise RuntimeError("La normalización de ml/dataset.py no coincide con la de estas imágenes. Envía este mensaje al orquestador.")
+else:
+    print("Coinciden.")
 """
 
 PREPROCESS = """
 # La entrada es exactamente la del contrato: RGB, resize directo INTER_LINEAR a 320×320,
-# /255 y normalización de ImageNet. Los aumentos solo se aplican en entrenamiento.
-from dataset import SegDataset, preprocess_seg
+# /255 y normalización con la media y desviación de nuestro train. Los aumentos solo se aplican en entrenamiento.
+from dataset import MEAN, STD, SegDataset, preprocess_seg
 from train import build_train_transform
 
 r = train_rows[0]
@@ -366,7 +382,7 @@ augmented = SegDataset(DATA_DIR, [r], ("train", "val"), build_train_transform())
 fig, axes = plt.subplots(1, 5, figsize=(13, 2.8))
 for ax in axes:
     img, m = augmented[0]
-    rgb = np.transpose(img, (1, 2, 0)) * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
+    rgb = np.transpose(img, (1, 2, 0)) * STD + MEAN
     ax.imshow(np.clip(rgb, 0, 1)); ax.axis("off")
 plt.suptitle("Aumentos de una misma imagen"); plt.tight_layout(); plt.show()
 print("Clases en la máscara tras aumentar:", sorted(set(np.unique(m).tolist())))
@@ -375,9 +391,9 @@ print("Clases en la máscara tras aumentar:", sorted(set(np.unique(m).tolist()))
 TRAIN_MD = """
 ## 8. Entrenamiento y validación
 
-Transfer learning: el encoder arranca con pesos de ImageNet y se congela en las 2 primeras épocas. Pérdida: entropía cruzada ponderada + Dice, ambas ignorando el 255. Se guarda el mejor modelo según el mIoU de validación y el entrenamiento para con *early stopping*.
+**Desde cero, sin *transfer learning*:** todos los pesos arrancan aleatorios y todo el modelo se entrena desde la primera época, con la misma tasa de aprendizaje. Pérdida: entropía cruzada ponderada + Dice, ambas ignorando el 255. Se guarda el mejor modelo según el mIoU de validación y el entrenamiento para con *early stopping* (15 épocas sin mejora).
 
-**Esta celda reanuda sola.** Si existe un checkpoint en Drive, continúa desde la época siguiente, sin editar nada. Cada línea muestra el tiempo medido de la época y una estimación del tiempo restante.
+**Esta celda reanuda sola.** Si existe un checkpoint en Drive, continúa desde la época siguiente, sin editar nada. Con 100 épocas es probable que necesites varias sesiones de Colab: cuando se corte, vuelve a pulsar *Ejecutar todo*. Cada línea muestra el tiempo medido de la época y una estimación del tiempo restante.
 """
 
 TRAIN = """
@@ -429,13 +445,11 @@ print(diagnosis)
 EXPORT_MD = """
 ## 10. Exportación
 
-`export.py` genera `kinetia_seg.pt`, `kinetia_seg.onnx` (opset 17, N dinámico, salida `logits` sin softmax), `manifest.json` y `hashes.sha256`, y verifica que `.pt` y `.onnx` coincidan con tolerancia `1e-4`. MiDaS se descarga solo para registrar su hash en `manifest.json`.
+`export.py` genera `kinetia_seg.pt`, `kinetia_seg.onnx` (opset 17, N dinámico, salida `logits` sin softmax), `manifest.json` y `hashes.sha256`, y verifica que `.pt` y `.onnx` coincidan con tolerancia `1e-4`. Solo exporta un modelo entrenado desde cero.
 """
 
 EXPORT = """
-midas_path = WORK / "midas" / "midas_small.onnx"
-run(sys.executable, "ml/fetch_depth_model.py", "--out", midas_path)
-run(sys.executable, "ml/export.py", "--checkpoint", RUN_DIR / "kinetia_seg.pt", "--midas", midas_path,
+run(sys.executable, "ml/export.py", "--checkpoint", RUN_DIR / "kinetia_seg.pt",
     "--out-dir", OUT_DIR, "--version", MODEL_VERSION, "--manifest", "ml/splits/manifest.csv")
 """
 
@@ -555,7 +569,7 @@ with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
     for name in ARTIFACTS:
         zf.write(OUT_DIR / name, arcname=name)
 
-final_dir = DRIVE_DIR / "artifacts"
+final_dir = DRIVE_DIR / "artifacts_desde_cero"
 final_dir.mkdir(parents=True, exist_ok=True)
 for name in (*ARTIFACTS, "kinetia_artifacts.zip"):
     tmp = final_dir / (name + ".tmp")

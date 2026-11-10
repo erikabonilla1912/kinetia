@@ -21,8 +21,14 @@ NUM_CLASSES = 7
 IGNORE_INDEX = 255
 FUEGO_LUZ = CLASSES.index("fuego_luz")
 INPUT_SIZE = 320
-MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+# Normalizacion calculada con NUESTRAS imagenes de entrenamiento (ml/compute_norm_stats.py),
+# no con los valores de ImageNet: el modelo se entrena desde cero.
+# Medido el 2026-11-09 sobre las 10 583 imagenes de train (1 083 699 200 pixeles por canal).
+MEAN = np.array([0.4657, 0.4461, 0.4079], dtype=np.float32)
+STD = np.array([0.2706, 0.2678, 0.2831], dtype=np.float32)
+# Marca de los checkpoints, del .pt y de manifest.json: todos los pesos arrancan aleatorios.
+# train.py no reanuda y export.py no exporta lo que no la tenga.
+INIT = "desde_cero"
 
 SOURCE_COCO = "coco_stuff"
 SOURCE_BOWFIRE = "bowfire"
@@ -61,7 +67,7 @@ def resize_mask(mask: np.ndarray) -> np.ndarray:
 
 
 def normalize_rgb(image_rgb: np.ndarray) -> np.ndarray:
-    """uint8 RGB (H, W, 3) -> float32 CHW normalizado con la media y std de ImageNet."""
+    """uint8 RGB (H, W, 3) -> float32 CHW normalizado con la media y std de nuestro train."""
     x = image_rgb.astype(np.float32) / 255.0
     x = (x - MEAN) / STD
     return np.transpose(x, (2, 0, 1))

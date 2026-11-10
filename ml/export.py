@@ -1,7 +1,9 @@
 """Exporta el mejor checkpoint a .pt y .onnx, y escribe manifest.json y hashes.sha256.
 
 Uso:
-    python ml/export.py --checkpoint <carpeta>/kinetia_seg.pt --midas models/midas_small.onnx --out-dir models
+    python ml/export.py --checkpoint <carpeta>/kinetia_seg.pt --out-dir models
+
+Solo acepta un .pt entrenado desde cero (marca `init`).
 """
 from __future__ import annotations
 
@@ -29,18 +31,23 @@ from dataset import (
     file_sha256,
     manifest_sha256,
 )
-from model import build_model
+from model import INIT, build_model
 
 OPSET = 17
 VERIFY_TOLERANCE = 1e-4
 SEG_ONNX = "kinetia_seg.onnx"
 SEG_PT = "kinetia_seg.pt"
-MIDAS_ONNX = "midas_small.onnx"
+
+
+class NotFromScratchError(RuntimeError):
+    """El .pt no viene de un entrenamiento desde cero: no se puede exportar."""
 
 
 def load_trained(path: Path) -> tuple[torch.nn.Module, dict]:
     payload = torch.load(path, map_location="cpu", weights_only=False)
-    model = build_model(pretrained=False)
+    if payload.get("init") != INIT:
+        raise NotFromScratchError(f"{path} no lleva la marca init={INIT!r}: es el modelo anterior, con pesos de ImageNet.")
+    model = build_model()
     model.load_state_dict(payload["state_dict"])
     model.eval()
     return model, payload
@@ -98,18 +105,18 @@ def verify_pt_vs_onnx(model: torch.nn.Module, path: Path, tolerance: float = VER
     return worst
 
 
-def write_manifest_json(out_dir: Path, midas: Path, manifest_csv: Path, version: str) -> dict:
+def write_manifest_json(out_dir: Path, manifest_csv: Path, version: str) -> dict:
     seg = out_dir / SEG_ONNX
     data = {
         "version": version,
         "created_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "init": INIT,
         "classes": CLASSES,
         "input_size": [INPUT_SIZE, INPUT_SIZE],
-        "mean": [round(float(v), 3) for v in MEAN],
-        "std": [round(float(v), 3) for v in STD],
+        "mean": [round(float(v), 4) for v in MEAN],
+        "std": [round(float(v), 4) for v in STD],
         "files": {
             SEG_ONNX: {"sha256": file_sha256(seg), "bytes": seg.stat().st_size},
-            MIDAS_ONNX: {"sha256": file_sha256(midas), "bytes": Path(midas).stat().st_size},
         },
         "dataset_manifest_sha256": manifest_sha256(manifest_csv),
     }
@@ -130,10 +137,9 @@ def write_hashes(out_dir: Path) -> None:
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--midas", type=Path, required=True, help="midas_small.onnx (ver fetch_depth_model.py)")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--out-dir", type=Path, default=Path("models"))
-    parser.add_argument("--version", default="seg-1.0.0")
+    parser.add_argument("--version", default="seg-2.0.0")
     args = parser.parse_args(argv)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -150,7 +156,7 @@ def main(argv=None) -> None:
     worst = verify_pt_vs_onnx(model, onnx_out)
     print(f".pt vs .onnx: diferencia maxima {worst:.2e} (tolerancia {VERIFY_TOLERANCE:.0e}), N dinamico comprobado")
 
-    manifest = write_manifest_json(args.out_dir, args.midas, args.manifest, args.version)
+    manifest = write_manifest_json(args.out_dir, args.manifest, args.version)
     write_hashes(args.out_dir)
     print(f"SHA-256 kinetia_seg.pt:   {file_sha256(pt_out)}")
     print(f"SHA-256 kinetia_seg.onnx: {manifest['files'][SEG_ONNX]['sha256']}")

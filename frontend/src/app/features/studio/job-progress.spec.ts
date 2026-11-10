@@ -82,7 +82,8 @@ describe('JobProgress', () => {
 
     it('marca la etapa actual y las anteriores según la API', async () => {
       await render({ phase: 'running', stage: 'rendering', progress: 0.5 });
-      expect(states()).toEqual(['done', 'done', 'done', 'current', 'pending']);
+      // Cola, Lectura, Animación, Codificación: sin etapa de profundidad (contrato v1.8).
+      expect(states()).toEqual(['done', 'done', 'current', 'pending']);
       expect(root().querySelector('[aria-current="step"]')?.textContent).toContain('Animación');
     });
 

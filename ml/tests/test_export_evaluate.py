@@ -24,13 +24,11 @@ def exported(mini_dataset, tmp_path_factory):
     _, manifest, _ = mini_dataset
     base = tmp_path_factory.mktemp("export")
     torch.manual_seed(0)
-    model = build_model(pretrained=False)
+    model = build_model()
     model.eval()
     tr.write_best_model(model, base, 1, 0.1, manifest_sha256(manifest))
-    midas = base / "midas_small.onnx"
-    midas.write_bytes(b"archivo de relleno: esta prueba solo necesita su hash")
     out = base / "out"
-    ex.main(["--checkpoint", str(base / "kinetia_seg.pt"), "--midas", str(midas), "--manifest", str(manifest), "--out-dir", str(out), "--version", "test"])
+    ex.main(["--checkpoint", str(base / "kinetia_seg.pt"), "--manifest", str(manifest), "--out-dir", str(out), "--version", "test"])
     return {"out": out, "model": model, "manifest": manifest}
 
 
@@ -46,7 +44,7 @@ def test_onnx_matches_pt_on_real_preprocessing(exported, mini_dataset):
 
 
 def test_verify_detects_a_different_model(exported):
-    other = build_model(pretrained=False)
+    other = build_model()
     with torch.no_grad():
         for p in other.parameters():
             p.add_(0.5)

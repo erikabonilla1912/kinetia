@@ -429,8 +429,6 @@ class JobManager:
             image = resize_to_work(media.image_bgr, self._settings.work_max_side)
             segmentation = self._models.segment(image)
             timings.segmentation = segmentation.elapsed_ms
-            self._store.update(job_id, stage="depth", progress=0.05, timings_json=timings.as_json())
-            depth, timings.depth = self._models.estimate_depth(image)
             self._log_brush(job_id, strokes, image.shape[1], image.shape[0])
             config = RenderConfig(
                 mood=mood,
@@ -440,7 +438,8 @@ class JobManager:
                 strokes=strokes,
                 brush_mode=row["brush_mode"],
             )
-            frames = engine.animate_image(image, segmentation.mask, depth, config, report)
+            # Sin modelo de profundidad: el motor no la usa (sin parallax, contrato v1.7).
+            frames = engine.animate_image(image, segmentation.mask, None, config, report)
             width, height = image.shape[1], image.shape[0]
             fps = IMAGE_FPS
             expected = round(config.duration_s * fps)
@@ -451,13 +450,6 @@ class JobManager:
             # Se remuestrea a fps entero; nunca más de MAX_FRAMES en total.
             fps = max(1, min(round(info.fps) or IMAGE_FPS, math.floor(self._settings.max_frames / info.duration_s)))
             expected = max(1, min(self._settings.max_frames, round(info.duration_s * fps)))
-            first = resize_to_work(media.image_bgr, self._settings.work_max_side)
-            if first.shape[:2] != (height, width):
-                first = None
-            self._store.update(job_id, stage="depth", progress=0.05)
-            depth = None
-            if first is not None:
-                depth, timings.depth = self._models.estimate_depth(first)
             self._log_brush(job_id, strokes, width, height)
             config = RenderConfig(
                 mood=mood,
@@ -475,7 +467,7 @@ class JobManager:
                 return segmentation.mask
 
             source = encoder.iter_video_frames(Path(row["input_path"]), width, height, fps, self._settings.max_frames)
-            frames = engine.animate_video(source, segment, self._settings.video_infer_every_n, config, depth, report)
+            frames = engine.animate_video(source, segment, self._settings.video_infer_every_n, config, None, report)
             segment_seconds = lambda: seg_clock["seconds"]  # noqa: E731
 
         self._store.update(job_id, stage="rendering", progress=RENDER_PROGRESS_START, timings_json=timings.as_json())

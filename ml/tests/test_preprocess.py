@@ -32,7 +32,10 @@ def test_uses_rgb_not_bgr():
     red_bgr = np.zeros((10, 10, 3), np.uint8)
     red_bgr[..., 2] = 255
     x = preprocess_seg(red_bgr)[0]
-    assert x[0].mean() > 2 and x[2].mean() < 0, "El rojo debe caer en el primer canal"
+    red_expected = (1.0 - MEAN[0]) / STD[0]
+    blue_expected = (0.0 - MEAN[2]) / STD[2]
+    assert x[0].mean() == pytest.approx(red_expected, abs=1e-5), "El rojo debe caer en el primer canal"
+    assert x[2].mean() == pytest.approx(blue_expected, abs=1e-5)
 
 
 def test_stored_png_gives_same_input_as_original_photo(tmp_path):

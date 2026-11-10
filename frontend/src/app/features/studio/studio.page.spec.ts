@@ -121,7 +121,7 @@ describe('StudioPage', () => {
 
     expect(q('result-seed')?.textContent).toBe('321');
     expect(q('timing-segmentation')?.textContent).toBe('1,5 ms');
-    expect(q('timing-depth')?.textContent).toBe('sin medir');
+    expect(q('timing-depth')).toBeNull(); // sin modelo de profundidad
     expect(q('timing-encode')?.textContent).toBe('sin medir');
     expect(q('timing-total')?.textContent).toBe('9,5 ms');
 

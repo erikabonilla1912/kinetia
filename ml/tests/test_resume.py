@@ -9,7 +9,7 @@ import torch
 import dataset as ds
 import train as tr
 
-COMMON = ["--batch-size", "2", "--num-workers", "0", "--no-pretrained", "--device", "cpu", "--freeze-encoder-epochs", "1", "--limit-train", "4", "--limit-val", "2"]
+COMMON = ["--batch-size", "2", "--num-workers", "0", "--device", "cpu", "--limit-train", "4", "--limit-val", "2"]
 
 
 def _args(mini, out, *extra):

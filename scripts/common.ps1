@@ -77,7 +77,7 @@ function Build-Image {
 function Build-AllImages {
     param([string]$ModelsSrc = 'models', [switch]$Force)
     $src = $ModelsSrc.Replace('\', '/').TrimEnd('/')
-    $modelFiles = 'kinetia_seg.onnx', 'midas_small.onnx', 'manifest.json', 'metrics.json' | ForEach-Object { "$src/$_" }
+    $modelFiles = 'kinetia_seg.onnx', 'manifest.json', 'metrics.json' | ForEach-Object { "$src/$_" }
     foreach ($file in $modelFiles) {
         if (-not (Test-Path (Join-Path $script:RepoRoot $file))) {
             throw "Falta $file. Coloca los archivos del modelo en $src/ (ver models/README.md) y ejecuta scripts/update-model-hashes.ps1."

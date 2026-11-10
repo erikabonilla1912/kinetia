@@ -73,13 +73,15 @@ describe('XrayPanel', () => {
   });
 
   it('un tiempo null se muestra como "sin medir", nunca como 0', async () => {
-    await render(testAnalysis());
-    expect(one('inference-depth')?.textContent).toContain('sin medir');
-    await render(testAnalysis({ inference_ms: { segmentation: null, depth: 0, total: null } }));
+    await render(testAnalysis({ inference_ms: { segmentation: null, depth: null, total: 0 } }));
     expect(one('inference-seg')?.textContent).toContain('sin medir');
-    expect(one('inference-total')?.textContent).toContain('sin medir');
     // Un cero medido sí es un dato.
-    expect(one('inference-depth')?.textContent).toContain('0,0 ms');
+    expect(one('inference-total')?.textContent).toContain('0,0 ms');
+  });
+
+  it('no muestra profundidad: ya no hay modelo de profundidad', async () => {
+    await render(testAnalysis());
+    expect(one('inference-depth')).toBeNull();
   });
 
   it('muestra el tiempo de inferencia recibido', async () => {

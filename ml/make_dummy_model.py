@@ -1,7 +1,7 @@
 """Genera modelos ONNX dummy para desarrollo (docs/CONTRATOS.md, sección 2.3).
 
-Solo necesita onnx y numpy. Los pesos son aleatorios: las máscaras y la profundidad
-que producen NO significan nada y nunca deben presentarse como resultado.
+Solo necesita onnx y numpy. Los pesos son aleatorios: las máscaras que produce NO significan
+nada y nunca deben presentarse como resultado. Ya no hay modelo de profundidad (contrato v1.8).
 
     python ml/make_dummy_model.py                  # escribe en models/dev/
     python ml/make_dummy_model.py --out DIR --seed 7
@@ -24,7 +24,10 @@ from onnx import TensorProto, helper, numpy_helper
 
 CLASSES = ["fondo", "cielo", "agua", "vegetacion", "fuego_luz", "persona", "animal"]
 SEG_SIZE = 320
-DEPTH_SIZE = 256
+# Deben ser los de ml/dataset.py y backend/app/services/preprocess.py: la API rechaza otro valor.
+NORM_MEAN = [0.4657, 0.4461, 0.4079]
+NORM_STD = [0.2706, 0.2678, 0.2831]
+INIT = "desde_cero"
 OPSET = 17
 IR_VERSION = 8
 DUMMY_VERSION = "dummy-dev"
@@ -93,23 +96,6 @@ def build_seg(path: Path, rng: np.random.Generator, heavy: bool) -> None:
     _save(graph, path)
 
 
-def build_depth(path: Path, rng: np.random.Generator, heavy: bool) -> None:
-    """Entrada [1,3,256,256]; salida [1,256,256], igual que el MiDaS v2.1 small oficial."""
-    nodes, inits = [], []
-    current, channels = _backbone(nodes, inits, rng, "input", heavy)
-    last = _conv(nodes, inits, rng, "conv_out", current, channels, 1)
-    inits.append(numpy_helper.from_array(np.array([1], dtype=np.int64), "squeeze_axes"))
-    nodes.append(helper.make_node("Squeeze", [last, "squeeze_axes"], ["depth"], name="squeeze"))
-    graph = helper.make_graph(
-        nodes,
-        "midas_small_dummy",
-        [helper.make_tensor_value_info("input", TensorProto.FLOAT, [1, 3, DEPTH_SIZE, DEPTH_SIZE])],
-        [helper.make_tensor_value_info("depth", TensorProto.FLOAT, [1, DEPTH_SIZE, DEPTH_SIZE])],
-        initializer=inits,
-    )
-    _save(graph, path)
-
-
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -118,17 +104,17 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def write_manifest(out: Path, seg: Path, depth: Path, version: str) -> None:
+def write_manifest(out: Path, seg: Path, version: str) -> None:
     manifest = {
         "version": version,
         "created_at": _now(),
+        "init": INIT,
         "classes": CLASSES,
         "input_size": [SEG_SIZE, SEG_SIZE],
-        "mean": [0.485, 0.456, 0.406],
-        "std": [0.229, 0.224, 0.225],
+        "mean": NORM_MEAN,
+        "std": NORM_STD,
         "files": {
             seg.name: {"sha256": _sha256(seg), "bytes": seg.stat().st_size},
-            depth.name: {"sha256": _sha256(depth), "bytes": depth.stat().st_size},
         },
         "dataset_manifest_sha256": ZERO_HASH,
     }
@@ -166,10 +152,11 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(args.seed)
     seg = args.out / "kinetia_seg.onnx"
-    depth = args.out / "midas_small.onnx"
     build_seg(seg, rng, args.heavy)
-    build_depth(depth, rng, args.heavy)
-    write_manifest(args.out, seg, depth, args.version)
+    stale = args.out / "midas_small.onnx"
+    if stale.exists():
+        stale.unlink()  # restos de versiones anteriores, con modelo de profundidad
+    write_manifest(args.out, seg, args.version)
     write_metrics(args.out, seg)
     print(f"Modelos dummy ({args.version}) escritos en {args.out}. Pesos aleatorios: no son resultados.")
 

@@ -20,8 +20,10 @@ import onnxruntime as ort
 
 from ..config import CLASS_NAMES, DUMMY_VERSION, NUM_CLASSES, Settings
 from ..observability import INFERENCE_SECONDS, log_event
-from .depth import DepthModel
-from .preprocess import SEG_INPUT_SIZE, preprocess_seg
+from .preprocess import NORM_MEAN_RGB, NORM_STD_RGB, SEG_INPUT_SIZE, preprocess_seg
+
+# Marca de manifest.json: modelo entrenado desde cero, sin transfer learning (ml/dataset.py::INIT).
+FROM_SCRATCH = "desde_cero"
 
 
 class ModelStartupError(RuntimeError):
@@ -91,17 +93,15 @@ class SegmentationResult:
 
 
 class ModelStore:
-    """Dueño del manifiesto y de las dos sesiones ONNX."""
+    """Dueño del manifiesto y de la sesión ONNX de segmentación."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._ready = threading.Event()
         self._seg_session: ort.InferenceSession | None = None
-        self._depth: DepthModel | None = None
         self.manifest: dict[str, Any] = {}
         self.version: str | None = None
         self.seg_sha256: str | None = None
-        self.depth_sha256: str | None = None
 
     @property
     def ready(self) -> bool:
@@ -129,23 +129,31 @@ class ModelStore:
             raise ModelStartupError("Las clases de manifest.json no coinciden con las del contrato.")
         if list(manifest.get("input_size", [])) != [SEG_INPUT_SIZE, SEG_INPUT_SIZE]:
             raise ModelStartupError("input_size de manifest.json no coincide con el contrato.")
+        if manifest.get("init") != FROM_SCRATCH:
+            raise ModelStartupError(
+                f"manifest.json no declara init='{FROM_SCRATCH}'. Solo se sirve el modelo entrenado desde cero, "
+                "sin transfer learning."
+            )
+        expected_norm = ([round(v, 4) for v in NORM_MEAN_RGB], [round(v, 4) for v in NORM_STD_RGB])
+        if (manifest.get("mean"), manifest.get("std")) != expected_norm:
+            raise ModelStartupError(
+                f"mean/std de manifest.json ({manifest.get('mean')}, {manifest.get('std')}) no coinciden con los de "
+                f"la API {expected_norm}: el modelo se entrenó con otra normalización."
+            )
 
-        hashes = {}
-        for model_path in (settings.seg_model_path, settings.depth_model_path):
-            if not model_path.is_file():
-                raise ModelStartupError(f"No existe el modelo {model_path}.")
-            actual = sha256_file(model_path)
-            expected = (files.get(model_path.name) or {}).get("sha256")
-            if expected != actual:
-                raise ModelStartupError(
-                    f"El SHA-256 de {model_path.name} ({actual}) no coincide con manifest.json ({expected})."
-                )
-            hashes[model_path] = actual
+        model_path = settings.seg_model_path
+        if not model_path.is_file():
+            raise ModelStartupError(f"No existe el modelo {model_path}.")
+        actual = sha256_file(model_path)
+        expected = (files.get(model_path.name) or {}).get("sha256")
+        if expected != actual:
+            raise ModelStartupError(
+                f"El SHA-256 de {model_path.name} ({actual}) no coincide con manifest.json ({expected})."
+            )
 
         self.manifest = manifest
         self.version = version
-        self.seg_sha256 = hashes[settings.seg_model_path]
-        self.depth_sha256 = hashes[settings.depth_model_path]
+        self.seg_sha256 = actual
         if version == DUMMY_VERSION:
             log_event("dummy_model_allowed", logging.WARNING, version=version)
 
@@ -155,25 +163,16 @@ class ModelStore:
         started = time.perf_counter()
         try:
             seg_session = make_session(settings.seg_model_path, settings.ort_intra_op_threads)
-            depth_session = make_session(settings.depth_model_path, settings.ort_intra_op_threads)
         except Exception as exc:  # ONNX Runtime usa excepciones propias para archivos inválidos.
-            raise ModelStartupError(f"No se pudo abrir un modelo ONNX: {exc}") from exc
+            raise ModelStartupError(f"No se pudo abrir el modelo ONNX: {exc}") from exc
         self._check_seg_signature(seg_session)
-        try:
-            depth = DepthModel(depth_session)
-            size = depth_session.get_inputs()[0].shape
-            depth.infer(np.zeros((size[2], size[3], 3), dtype=np.uint8))
-        except Exception as exc:
-            raise ModelStartupError(f"El modelo de profundidad no cumple la firma: {exc}") from exc
         self._seg_session = seg_session
-        self._depth = depth
         self._ready.set()
         log_event(
             "models_loaded",
             duration_ms=round((time.perf_counter() - started) * 1000.0, 1),
             version=self.version,
             model_sha256=self.seg_sha256,
-            depth_sha256=self.depth_sha256,
         )
 
     @staticmethod
@@ -205,8 +204,3 @@ class ModelStore:
         elapsed = time.perf_counter() - started
         INFERENCE_SECONDS.labels(model="seg").observe(elapsed)
         return SegmentationResult(mask=mask, classes=stats, elapsed_ms=elapsed * 1000.0)
-
-    def estimate_depth(self, image_bgr: np.ndarray) -> tuple[np.ndarray, float]:
-        if self._depth is None:
-            raise RuntimeError("El modelo de profundidad no está cargado")
-        return self._depth.predict(image_bgr)

@@ -10,7 +10,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io/${{ github.repository_owner }}
-  # Tag del GitHub Release con los modelos (kinetia_seg.onnx, midas_small.onnx, manifest.json, metrics.json).
+  # Tag del GitHub Release con los modelos (kinetia_seg.onnx, manifest.json, metrics.json).
   MODELS_RELEASE_TAG: ${{ vars.MODELS_RELEASE_TAG || 'models-latest' }}
 
 jobs:
@@ -130,9 +130,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download "$MODELS_RELEASE_TAG" --dir models \
-            --pattern kinetia_seg.onnx --pattern midas_small.onnx --pattern manifest.json --pattern metrics.json
+            --pattern kinetia_seg.onnx --pattern manifest.json --pattern metrics.json
           . k8s/base/model-hashes.env
           echo "$EXPECTED_SHA256_SEG  models/kinetia_seg.onnx" | sha256sum -c -
-          echo "$EXPECTED_SHA256_DEPTH  models/midas_small.onnx" | sha256sum -c -
           docker build -t "$REGISTRY/kinetia-model-loader:$GITHUB_SHA" -f model-loader/Dockerfile .
           docker push "$REGISTRY/kinetia-model-loader:$GITHUB_SHA"

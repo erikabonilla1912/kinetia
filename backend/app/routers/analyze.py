@@ -28,16 +28,11 @@ def _png_base64(array: np.ndarray) -> str:
     return base64.b64encode(encoded.tobytes()).decode("ascii")
 
 
-def _analyze_sync(services: AppServices, path: Path, include_depth: bool, started: float) -> dict[str, Any]:
+def _analyze_sync(services: AppServices, path: Path, started: float) -> dict[str, Any]:
     settings = services.settings
     media = validate_media(path, settings)
     image = resize_to_work(media.image_bgr, settings.work_max_side)
     segmentation = services.models.segment(image)
-    depth_ms = None
-    depth_png = None
-    if include_depth:
-        depth, depth_ms = services.models.estimate_depth(image)
-        depth_png = _png_base64(np.round(depth * 255.0).astype(np.uint8))
     mask_png = _png_base64(segmentation.mask)
     return {
         "width": image.shape[1],
@@ -46,10 +41,11 @@ def _analyze_sync(services: AppServices, path: Path, include_depth: bool, starte
         "classes": segmentation.classes,
         "inference_ms": {
             "segmentation": round(segmentation.elapsed_ms, 1),
-            "depth": round(depth_ms, 1) if depth_ms is not None else None,
+            # Sin modelo de profundidad desde el contrato v1.8: los campos se mantienen en null.
+            "depth": None,
             "total": round((time.perf_counter() - started) * 1000.0, 1),
         },
-        "depth_png_base64": depth_png,
+        "depth_png_base64": None,
         "model_version": services.models.version,
         "model_sha256": services.models.seg_sha256,
         "conf_threshold": settings.conf_threshold,
@@ -59,7 +55,7 @@ def _analyze_sync(services: AppServices, path: Path, include_depth: bool, starte
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(
     file: Optional[UploadFile] = File(None),
-    include_depth: bool = Form(False),
+    include_depth: bool = Form(False),  # se acepta y se ignora: ya no hay modelo de profundidad
     services: AppServices = Depends(get_services),
 ) -> dict[str, Any]:
     started = time.perf_counter()
@@ -69,7 +65,7 @@ async def analyze(
     try:
         # Fuera del bucle de eventos: /health y el resto de la API siguen respondiendo.
         return await anyio.to_thread.run_sync(
-            functools.partial(_analyze_sync, services, path, include_depth, started),
+            functools.partial(_analyze_sync, services, path, started),
             limiter=services.analyze_limiter,
         )
     finally:

@@ -77,10 +77,10 @@ def test_health_ok_fields(client, settings):
     assert response.json() == {
         "status": "ok",
         "model_loaded": True,
-        "depth_loaded": True,
+        "depth_loaded": False,  # contrato v1.8: sin modelo de profundidad
         "model_version": "dummy-dev",
         "model_sha256": sha256_file(settings.seg_model_path),
-        "depth_sha256": sha256_file(settings.depth_model_path),
+        "depth_sha256": None,
     }
 
 
@@ -122,7 +122,7 @@ def test_models_are_loaded_once(settings, engine, monkeypatch):
     with running_client(settings, lambda: engine) as client:
         for _ in range(3):
             assert post_file(client, "/analyze", image_bytes(), include_depth="true").status_code == 200
-    assert sorted(name for name, _ in calls) == ["kinetia_seg.onnx", "midas_small.onnx"]
+    assert sorted(name for name, _ in calls) == ["kinetia_seg.onnx"]
 
 
 def test_intra_op_threads_setting_is_applied(settings, engine, monkeypatch):
@@ -136,7 +136,7 @@ def test_intra_op_threads_setting_is_applied(settings, engine, monkeypatch):
     monkeypatch.setattr(inference.ort, "InferenceSession", spy)
     with running_client(settings, lambda: engine):
         pass
-    assert seen == [settings.ort_intra_op_threads] * 2
+    assert seen == [settings.ort_intra_op_threads]
 
 
 def test_health_live_does_not_touch_model_or_disk(settings, engine):
@@ -154,8 +154,34 @@ def test_missing_manifest_refuses_start(tmp_path, dummy_models):
 
 def test_missing_model_file_refuses_start(tmp_path, dummy_models):
     models = copy_models(dummy_models, tmp_path / "m")
-    (models / "midas_small.onnx").unlink()
+    (models / "kinetia_seg.onnx").unlink()
     with pytest.raises(ModelStartupError, match="No existe"):
+        ModelStore(make_settings(tmp_path, models)).preflight()
+
+
+def _edit_manifest(models: Path, **changes) -> None:
+    manifest = json.loads((models / "manifest.json").read_text(encoding="utf-8"))
+    for key, value in changes.items():
+        if value is None:
+            manifest.pop(key, None)
+        else:
+            manifest[key] = value
+    (models / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+@pytest.mark.parametrize("init", [None, "imagenet"])
+def test_model_not_trained_from_scratch_refuses_start(tmp_path, dummy_models, init):
+    """El modelo anterior, con transfer learning, no lleva init=desde_cero y no se sirve."""
+    models = copy_models(dummy_models, tmp_path / "m")
+    _edit_manifest(models, init=init)
+    with pytest.raises(ModelStartupError, match="desde_cero"):
+        ModelStore(make_settings(tmp_path, models)).preflight()
+
+
+def test_imagenet_normalization_refuses_start(tmp_path, dummy_models):
+    models = copy_models(dummy_models, tmp_path / "m")
+    _edit_manifest(models, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    with pytest.raises(ModelStartupError, match="mean/std"):
         ModelStore(make_settings(tmp_path, models)).preflight()
 
 
@@ -287,40 +313,19 @@ def test_swapping_model_with_same_signature_needs_no_code_change(tmp_path, engin
     assert set(one) == set(two)
 
 
-def test_official_style_depth_signature_is_supported(tmp_path, dummy_models, engine):
-    """El MiDaS oficial usa otros nombres de entrada y salida, y salida con canal explícito."""
-    models = copy_models(dummy_models, tmp_path / "m")
-    path = models / "midas_small.onnx"
-    weights = onnx.numpy_helper.from_array(np.ones((1, 3, 1, 1), dtype=np.float32), "w")
-    node = helper.make_node("Conv", ["0", "w"], ["1"], kernel_shape=[1, 1])
-    graph = helper.make_graph(
-        [node],
-        "official_like",
-        [helper.make_tensor_value_info("0", TensorProto.FLOAT, [1, 3, 256, 256])],
-        [helper.make_tensor_value_info("1", TensorProto.FLOAT, [1, 1, 256, 256])],
-        initializer=[weights],
-    )
-    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
-    model.ir_version = 8
-    onnx.save(model, str(path))
-    _rewrite_manifest(models, path)
-    with running_client(make_settings(tmp_path, models), lambda: engine) as client:
-        response = post_file(client, "/analyze", image_bytes(), include_depth="true")
-        assert response.status_code == 200
-        assert response.json()["depth_png_base64"]
-
-
 def test_dummy_models_follow_contract(dummy_models):
     manifest = json.loads((dummy_models / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["version"] == "dummy-dev"
     assert set(manifest) == {
-        "version", "created_at", "classes", "input_size", "mean", "std", "files", "dataset_manifest_sha256",
+        "version", "created_at", "init", "classes", "input_size", "mean", "std", "files", "dataset_manifest_sha256",
     }
+    assert manifest["init"] == "desde_cero"
     assert manifest["classes"] == ["fondo", "cielo", "agua", "vegetacion", "fuego_luz", "persona", "animal"]
-    for name in ("kinetia_seg.onnx", "midas_small.onnx"):
-        entry = manifest["files"][name]
-        assert entry["sha256"] == sha256_file(dummy_models / name)
-        assert entry["bytes"] == (dummy_models / name).stat().st_size
+    assert set(manifest["files"]) == {"kinetia_seg.onnx"}
+    entry = manifest["files"]["kinetia_seg.onnx"]
+    assert entry["sha256"] == sha256_file(dummy_models / "kinetia_seg.onnx")
+    assert entry["bytes"] == (dummy_models / "kinetia_seg.onnx").stat().st_size
+    assert not (dummy_models / "midas_small.onnx").exists()
 
     seg = onnx.load(str(dummy_models / "kinetia_seg.onnx"))
     assert seg.opset_import[0].version >= 17
@@ -331,5 +336,3 @@ def test_dummy_models_follow_contract(dummy_models):
     for batch in (1, 3):
         out = session.run(None, {"input": np.zeros((batch, 3, 320, 320), np.float32)})[0]
         assert out.shape == (batch, 7, 320, 320)
-    depth = onnxruntime.InferenceSession(str(dummy_models / "midas_small.onnx"), providers=["CPUExecutionProvider"])
-    assert depth.get_inputs()[0].shape == [1, 3, 256, 256]

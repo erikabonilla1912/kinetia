@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from dataset import CLASSES, file_sha256
+from dataset import CLASSES, INIT, MEAN, STD, file_sha256
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -16,19 +16,21 @@ ARTIFACTS = ("kinetia_seg.pt", "kinetia_seg.onnx", "metrics.json", "manifest.jso
 
 def validate_manifest(data: dict) -> list[str]:
     p: list[str] = []
-    keys = {"version", "created_at", "classes", "input_size", "mean", "std", "files", "dataset_manifest_sha256"}
+    keys = {"version", "created_at", "init", "classes", "input_size", "mean", "std", "files", "dataset_manifest_sha256"}
     if set(data) != keys:
         p.append(f"manifest.json: campos {sorted(set(data) ^ keys)} sobran o faltan")
         return p
+    if data["init"] != INIT:
+        p.append(f"manifest.json: init debe ser {INIT!r} (modelo entrenado desde cero)")
     if data["classes"] != CLASSES:
         p.append("manifest.json: clases incorrectas")
     if data["input_size"] != [320, 320]:
         p.append("manifest.json: input_size incorrecto")
-    if data["mean"] != [0.485, 0.456, 0.406] or data["std"] != [0.229, 0.224, 0.225]:
-        p.append("manifest.json: mean/std incorrectos")
+    if data["mean"] != [round(float(v), 4) for v in MEAN] or data["std"] != [round(float(v), 4) for v in STD]:
+        p.append("manifest.json: mean/std no son los de ml/dataset.py")
     if not ISO.match(data["created_at"]):
         p.append("manifest.json: created_at no es ISO 8601 UTC")
-    if set(data["files"]) != {"kinetia_seg.onnx", "midas_small.onnx"}:
+    if set(data["files"]) != {"kinetia_seg.onnx"}:
         p.append("manifest.json: files incorrecto")
     for name, info in data["files"].items():
         if not HEX64.match(info["sha256"]) or not isinstance(info["bytes"], int) or info["bytes"] <= 0:

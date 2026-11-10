@@ -34,7 +34,6 @@ class Settings(BaseSettings):
 
     models_dir: Path = Path("/models")
     seg_model_file: str = "kinetia_seg.onnx"
-    depth_model_file: str = "midas_small.onnx"
     results_dir: Path = Path("/data/results")
     db_path: Path = Path("/data/db/kinetia.db")
     tmp_dir: Path = Path("/shared-tmp/api")
@@ -59,10 +58,6 @@ class Settings(BaseSettings):
     @property
     def seg_model_path(self) -> Path:
         return self.models_dir / self.seg_model_file
-
-    @property
-    def depth_model_path(self) -> Path:
-        return self.models_dir / self.depth_model_file
 
     @property
     def manifest_path(self) -> Path:

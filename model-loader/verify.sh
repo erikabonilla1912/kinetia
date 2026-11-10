@@ -12,7 +12,9 @@ fail() {
 }
 
 [ -n "${EXPECTED_SHA256_SEG:-}" ] || fail "falta EXPECTED_SHA256_SEG"
-[ -n "${EXPECTED_SHA256_DEPTH:-}" ] || fail "falta EXPECTED_SHA256_DEPTH"
+
+# Desde el contrato v1.8 no hay modelo de profundidad: se borra el de volúmenes antiguos.
+rm -f "$MODELS_DIR/midas_small.onnx"
 
 # Copia atómica: un corte a medias no deja un archivo truncado con el nombre final.
 install_from_image() {
@@ -20,7 +22,7 @@ install_from_image() {
     mv "$MODELS_DIR/.$1.tmp" "$MODELS_DIR/$1"
 }
 
-for name in kinetia_seg.onnx midas_small.onnx manifest.json metrics.json; do
+for name in kinetia_seg.onnx manifest.json metrics.json; do
     if [ ! -f "$MODELS_DIR/$name" ]; then
         echo "model-loader: copiando $name al volumen"
         install_from_image "$name"
@@ -43,12 +45,7 @@ replace_stale() {
 }
 
 # Las métricas y el manifiesto describen al modelo: si cambia, se reemplazan con él.
-seg_replaced=false
 if replace_stale kinetia_seg.onnx "$EXPECTED_SHA256_SEG"; then
-    seg_replaced=true
-fi
-replace_stale midas_small.onnx "$EXPECTED_SHA256_DEPTH" || true
-if [ "$seg_replaced" = true ]; then
     install_from_image manifest.json
     install_from_image metrics.json
 fi
@@ -64,5 +61,4 @@ check() {
 }
 
 check kinetia_seg.onnx "$EXPECTED_SHA256_SEG"
-check midas_small.onnx "$EXPECTED_SHA256_DEPTH"
 echo "model-loader: verificación correcta"
