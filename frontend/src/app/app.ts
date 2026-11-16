@@ -48,6 +48,12 @@ import { DummyModelBanner } from './shared/dummy-model-banner';
               >Modelo</a
             >
             <a
+              routerLink="/entrenamiento"
+              routerLinkActive="!text-paper bg-white/10"
+              class="hidden min-h-11 items-center rounded-full px-3 text-mist hover:text-paper sm:flex"
+              >Entrenamiento</a
+            >
+            <a
               routerLink="/expo/pantalla"
               class="flex min-h-11 items-center rounded-full px-3 text-mist hover:text-paper"
               >Muro</a

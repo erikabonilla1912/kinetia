@@ -118,6 +118,20 @@ export interface GalleryResponse {
   items: GalleryItem[];
 }
 
+/** Una época de history.json, tal como la escribe ml/train.py. */
+export interface TrainingEpoch {
+  epoch: number;
+  train_loss: number;
+  val_loss: number;
+  train_miou: number;
+  val_miou: number;
+  val_pixel_accuracy: number;
+  val_iou_per_class: Record<string, number>;
+  lr: number;
+  seconds: number;
+  train_seconds: number;
+}
+
 export interface ModelMetrics {
   /** Solo en el metrics.json del modelo de desarrollo. */
   dummy?: boolean;

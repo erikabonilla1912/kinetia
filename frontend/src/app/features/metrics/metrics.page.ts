@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ModelMetrics } from '../../core/api.models';
 import { ApiError, toApiError } from '../../core/api-error';
 import { ApiService } from '../../core/api.service';
@@ -12,7 +13,7 @@ import { ErrorNotice } from '../../shared/error-notice';
  */
 @Component({
   selector: 'app-metrics-page',
-  imports: [DatePipe, ErrorNotice],
+  imports: [DatePipe, ErrorNotice, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="mx-auto max-w-[1400px] px-4 pb-16 pt-8 sm:px-6">
@@ -24,6 +25,9 @@ import { ErrorNotice } from '../../shared/error-notice';
           Se calculó sobre imágenes reservadas para prueba, evaluando el ONNX que corre en producción.
         }
       </p>
+      <a routerLink="/entrenamiento" class="mt-3 inline-flex min-h-11 items-center font-semibold text-xray" data-testid="metrics-training-link">
+        Cómo lo entrenamos desde cero →
+      </a>
 
       @if (error(); as err) {
         <div class="mt-8 max-w-2xl" data-testid="metrics-error">

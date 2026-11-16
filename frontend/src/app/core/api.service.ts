@@ -9,6 +9,7 @@ import {
   GalleryResponse,
   HealthResponse,
   JobResponse,
+  TrainingEpoch,
 } from './api.models';
 import { toApiError } from './api-error';
 
@@ -89,4 +90,15 @@ export class ApiService {
       this.http.get(`${API_BASE}/model/metrics`, { responseType: 'text' }),
     );
   }
+
+  /**
+   * Copia literal del history.json que escribió ml/train.py en Colab. Es un archivo
+   * estático del frontend, no de la API: describe cómo se entrenó el modelo desplegado.
+   */
+  getTrainingHistory(): Observable<TrainingEpoch[]> {
+    return this.normalized(this.http.get<TrainingEpoch[]>(TRAINING_HISTORY_URL));
+  }
 }
+
+/** Ruta del historial en public/; ver frontend/public/datos. */
+export const TRAINING_HISTORY_URL = '/datos/history-entrenamiento.json';

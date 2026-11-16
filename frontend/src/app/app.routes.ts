@@ -13,6 +13,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/metrics/metrics.page').then((m) => m.MetricsPage),
   },
   {
+    path: 'entrenamiento',
+    title: 'KINETIA · Cómo lo entrenamos',
+    loadComponent: () => import('./features/training/training.page').then((m) => m.TrainingPage),
+  },
+  {
     path: 'expo/subir',
     title: 'KINETIA · Anima tu foto',
     data: { chrome: false },
