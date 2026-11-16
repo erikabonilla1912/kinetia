@@ -77,6 +77,10 @@ describe('TrainingPage', () => {
     expect(q('chart-loss')).not.toBeNull();
     expect(q('chart-miou')?.textContent).toContain('época 3');
     expect(root().querySelectorAll('[data-testid="training-class-row"]').length).toBe(2);
+    const faq = q('faq')?.textContent ?? '';
+    expect(root().querySelectorAll('[data-testid="faq-item"]').length).toBe(8);
+    expect(faq).toContain('0,6347');
+    expect(faq).toContain('durante 4 épocas');
   });
 
   it('no muestra un mIoU de prueba si metrics.json es del modelo dummy', async () => {

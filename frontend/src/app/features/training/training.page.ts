@@ -5,6 +5,7 @@ import { ApiError, toApiError } from '../../core/api-error';
 import { ApiService, TRAINING_HISTORY_URL } from '../../core/api.service';
 import { ConfigStore } from '../../core/stores';
 import { ErrorNotice } from '../../shared/error-notice';
+import { Faq } from './faq';
 import { COMPACT_FRAME, FRAME, MIN_DELTA, formatNumber, lineChart, summarize } from './training-summary';
 
 /**
@@ -13,7 +14,7 @@ import { COMPACT_FRAME, FRAME, MIN_DELTA, formatNumber, lineChart, summarize } f
  */
 @Component({
   selector: 'app-training-page',
-  imports: [ErrorNotice, RouterLink],
+  imports: [ErrorNotice, Faq, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="mx-auto max-w-[1400px] px-4 pb-16 pt-8 sm:px-6">
@@ -165,6 +166,8 @@ import { COMPACT_FRAME, FRAME, MIN_DELTA, formatNumber, lineChart, summarize } f
             </ol>
           </section>
         </div>
+
+        <app-faq [testMiou]="testMiou()" [epochs]="s.epochs" />
       } @else {
         <div class="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true" data-testid="training-loading">
           @for (slot of [1, 2, 3, 4]; track slot) {
