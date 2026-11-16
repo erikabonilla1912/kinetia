@@ -1,6 +1,6 @@
 # KINETIA — Registro de avance
 
-**Última actualización:** 2026-11-10 · **Fase actual:** 2, en curso: integración con el modelo desde cero (plan aprobado por el equipo el 2026-11-02)
+**Última actualización:** 2026-11-16 · **Fase actual:** 2, en curso: integración con el modelo desde cero (plan aprobado por el equipo el 2026-11-02)
 
 Estados: `pendiente`, `en curso`, `en revisión`, `aprobada`, `bloqueada`. Una tarea solo pasa a `aprobada` con evidencia que el orquestador haya verificado.
 
@@ -51,11 +51,11 @@ La tabla completa, con su mitigación, está en [PLAN.md](PLAN.md#6-riesgos).
 | mIoU por debajo de 0.55 con el modelo desde cero | **Cerrado** el 10 nov: 0,6347 en prueba, verificado por el orquestador | — |
 | Cortes o cuota de Colab con 100 épocas | **Cerrado:** el entrenamiento terminó (mejor época 86) | — |
 | Clase fuego_luz débil: IoU 0,268 con el modelo desde cero; recall de luces de COCO-Stuff 0,2861, de fuego en BoWFire 0,7662 | Abierto; se declara en la demo y en el documento. En una foto nocturna de BoWFire, el fuego se detecta pero la oscuridad alrededor sale como cielo y el suelo como persona | Fase 2 |
-| Curvas de pérdida del modelo desde cero | Pendiente de revisar en `curvas.png` para el documento | Documento |
+| Sobreajuste del modelo desde cero: según `history.json` (100 épocas, 4,38 h), la pérdida de validación toca su mínimo en la época 56 (0,8647) y sube hasta cerca de 0,91; el mIoU de entrenamiento llega a 0,80 y el de validación a 0,64 | Aceptado: se guarda por mIoU de validación (época 86, 0,6434; la 89 dio 0,6443, pero no superó la mejora mínima de 0,001); la prueba, 0,6347, queda cerca. Explicado en el documento del entrenamiento | Sustentación |
 | El wifi de la Expo bloquea el QR | Abierto; requiere router propio | 18 nov |
 | RAM justa en el portátil | Abierto | Fase 2 |
 | Límite de uso de la cuenta: cuatro agentes en paralelo lo agotaron en menos de una hora y se perdió cerca de un día | Abierto; se trabaja por tandas | Cada fase |
-| **Errores del modelo visibles en el video:** con el modelo desde cero, las montañas del caballo siguen saliendo como agua (10 % de la foto) y el reflejo de los árboles del lago, como vegetación. En 3 fotogramas por video no se ven rayas evidentes | Abierto; falta que Erika vea los videos de `samples_output/modelo_desde_cero` y, si hace falta, la limpieza en el motor | Fase 2 |
+| **Errores del modelo visibles en el video:** con el modelo desde cero, las montañas del caballo siguen saliendo como agua (10 % de la foto) y el reflejo de los árboles del lago, como vegetación. En 3 fotogramas por video no se ven rayas evidentes | **Cerrado** el 16 nov: Erika vio los videos de `samples_output/modelo_desde_cero` y dijo "se ven bien". No se corrige el motor | — |
 | Modelo poco fiable fuera de fotos reales: en un lago dibujado clasificó casi toda el agua como fondo; un fondo oscuro desenfocado salió como vegetación | Abierto; se declara y se usan fotos en la demo | Fase 2 |
 | Render muy sensible a la carga del portátil: lago 1280×720, 4 s, en el pod: 66 s y 78 s con el equipo al 100 % de CPU y en batería; 11,9 s con el equipo más libre. Caballo: 85,9 s y 17,9 s | Abierto; falta medir enchufado y con el equipo libre. En la Expo: cargador conectado y otros programas cerrados | Fase 2 |
 | **El portátil entra en espera por inactividad y congela los jobs:** un render de unos 20 s tardó 1618 s por una espera de 21:10 a 21:37 del 3 nov, comprobada en el registro de Windows | Abierto; `make demo` debe impedir la espera mientras corra; también afecta el entrenamiento en Colab | Fase 2 |
