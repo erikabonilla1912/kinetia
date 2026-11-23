@@ -155,6 +155,6 @@ python ml/demo_entrenamiento.py
 
 ## Documentación
 
-- Documento técnico y arquitectónico (stack, C4, UML, modelo): `docs/entrega/`
+- Documento técnico y arquitectónico (stack, C4, UML, modelo): [docs/entrega/KINETIA_documento_tecnico.pdf](docs/entrega/KINETIA_documento_tecnico.pdf)
 - Contratos de interfaces: [docs/CONTRATOS.md](docs/CONTRATOS.md)
 - Bitácora y decisiones: [docs/PROGRESO.md](docs/PROGRESO.md)
