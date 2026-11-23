@@ -37,7 +37,8 @@ def test_every_embedded_file_matches_ml_dir():
 
 
 def test_every_ml_python_file_is_embedded():
-    expected = {p.name for p in ML_DIR.glob("*.py")} - {"build_notebook.py", "make_dummy_model.py"}  # este ultimo es del Agente Backend
+    # make_dummy_model.py es del Agente Backend; demo_entrenamiento.py es la demostracion local en CPU, no corre en Colab.
+    expected = {p.name for p in ML_DIR.glob("*.py")} - {"build_notebook.py", "make_dummy_model.py", "demo_entrenamiento.py"}
     assert expected <= set(bn.EMBEDDED), f"Sin incrustar: {expected - set(bn.EMBEDDED)}"
 
 
@@ -48,6 +49,14 @@ def test_embedded_manifest_matches_file():
     blob = re.search(r'_MANIFEST_B64 = """\n(.*?)\n"""', text, re.S).group(1)
     data = gzip.decompress(base64.b64decode(blob))
     assert data == DEFAULT_MANIFEST.read_bytes().replace(b"\r\n", b"\n")
+
+
+def test_executed_notebook_has_same_code_as_source():
+    """La copia ejecutada en Colab (con salidas, para la entrega) corrio exactamente este codigo."""
+    executed = bn.NOTEBOOK.with_name("kinetia_training_ejecutado.ipynb")
+    nb = json.loads(executed.read_text(encoding="utf-8"))
+    assert _sources(nb) == _sources(bn.build())
+    assert any(cell.get("outputs") for cell in nb["cells"] if cell["cell_type"] == "code")
 
 
 def test_committed_notebook_has_no_outputs():

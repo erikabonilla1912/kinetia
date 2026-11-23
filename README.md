@@ -8,7 +8,8 @@ Aplicación web que anima fotos y videos cortos. Una red de segmentación semán
 
 | Ruta | Qué hay |
 | --- | --- |
-| `notebooks/kinetia_training.ipynb` | Notebook de Colab: exploración, preprocesamiento, entrenamiento, validación, evaluación, gráficas y conclusiones |
+| `notebooks/kinetia_training_ejecutado.ipynb` | **Notebook ejecutado en Colab, con todas sus salidas:** exploración, preprocesamiento, entrenamiento (100 épocas), validación, evaluación, gráficas y conclusiones |
+| `notebooks/kinetia_training.ipynb` | El mismo notebook sin salidas, generado por `ml/build_notebook.py`. Una prueba verifica que el ejecutado corrió exactamente este código |
 | `ml/` | Código de entrenamiento (`train.py`), evaluación (`evaluate.py`), exportación a ONNX (`export.py`) y pruebas |
 | `backend/` | API en FastAPI y motor de animación (`animation_engine/`) |
 | `frontend/` | Interfaz en Angular 20 |
